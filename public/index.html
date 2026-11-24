@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HitechDairy ERP Data Onboarding — Serverless Cloud Runner</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <style>
+    :root {
+      --font-main: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+      --bg-base: #f8fafc;
+      --bg-surface: #ffffff;
+      --bg-alt: #f1f5f9;
+      --border: #e2e8f0;
+      --text-main: #0f172a;
+      --text-secondary: #64748b;
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --primary-light: #eff6ff;
+      --success: #16a34a;
+      --success-light: #f0fdf4;
+      --danger: #dc2626;
+      --danger-light: #fef2f2;
+      --warning: #d97706;
+      --warning-light: #fffbeb;
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 14px;
+      --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+      --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.04);
+      --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08);
+    }
+
+    [data-theme="dark"] {
+      --bg-base: #090d16;
+      --bg-surface: #111827;
+      --bg-alt: #1f2937;
+      --border: #374151;
+      --text-main: #f9fafb;
+      --text-secondary: #9ca3af;
+      --primary: #3b82f6;
+      --primary-hover: #60a5fa;
+      --primary-light: rgba(59, 130, 246, 0.15);
+      --success: #22c55e;
+      --success-light: rgba(34, 197, 94, 0.15);
+      --danger: #ef4444;
+      --danger-light: rgba(239, 68, 68, 0.15);
+      --warning: #f59e0b;
+      --warning-light: rgba(245, 158, 11, 0.15);
+      --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+      --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+      --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: var(--font-main);
+      background: var(--bg-base);
+      color: var(--text-main);
+      line-height: 1.5;
+      padding-bottom: 3rem;
+      min-height: 100vh;
+    }
+
+    .header-bar {
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0.9rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .brand-group { display: flex; align-items: center; gap: 0.75rem; }
+    .brand-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: var(--radius-md);
+      background: linear-gradient(135deg, var(--primary), #8b5cf6);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.25rem;
+    }
+    .brand-title { font-size: 1.15rem; font-weight: 800; letter-spacing: -0.02em; }
+    .cloud-pill {
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 0.2rem 0.55rem;
+      border-radius: 999px;
+      background: var(--primary-light);
+      color: var(--primary);
+      border: 1px solid var(--primary);
+    }
+
+    .header-actions { display: flex; align-items: center; gap: 1rem; }
+    .clock-badge {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      background: var(--bg-alt);
+      padding: 0.35rem 0.7rem;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+    }
+    .btn-toggle {
+      background: var(--bg-alt);
+      border: 1px solid var(--border);
+      color: var(--text-main);
+      padding: 0.4rem 0.75rem;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+    .btn-toggle:hover { border-color: var(--primary); }
+
+    .container { max-width: 1200px; margin: 1.5rem auto; padding: 0 1.25rem; display: flex; flex-direction: column; gap: 1.5rem; }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+    @media (max-width: 900px) { .grid-2 { grid-template-columns: 1fr; } }
+
+    .card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 1.25rem 1.4rem;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .card-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--text-main);
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .step-badge {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: var(--primary-light);
+      color: var(--primary);
+      font-size: 0.75rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+    }
+
+    .dropzone {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius-md);
+      padding: 2rem 1rem;
+      text-align: center;
+      background: var(--bg-alt);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .dropzone:hover, .dropzone.dragover {
+      border-color: var(--primary);
+      background: var(--primary-light);
+    }
+    .dropzone-icon { font-size: 2.2rem; margin-bottom: 0.5rem; }
+    .dropzone-text { font-size: 0.88rem; font-weight: 600; }
+    .dropzone-hint { font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem; }
+
+    .file-info-bar {
+      margin-top: 0.85rem;
+      padding: 0.65rem 0.9rem;
+      border-radius: var(--radius-md);
+      background: var(--bg-alt);
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.82rem;
+    }
+
+    .module-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+      gap: 0.6rem;
+      margin-top: 0.85rem;
+    }
+    .module-chip {
+      background: var(--bg-alt);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 0.6rem 0.7rem;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.15s ease;
+    }
+    .module-chip:hover { border-color: var(--primary); }
+    .module-chip.active {
+      border-color: var(--primary);
+      background: var(--primary-light);
+      box-shadow: 0 0 0 1px var(--primary);
+    }
+    .module-chip-title { font-size: 0.8rem; font-weight: 700; }
+    .module-chip-count { font-size: 0.7rem; color: var(--text-secondary); margin-top: 0.15rem; }
+
+    .field-group { margin-bottom: 0.9rem; }
+    .field-label { display: block; font-size: 0.78rem; font-weight: 700; color: var(--text-secondary); margin-bottom: 0.35rem; }
+    .select, .input {
+      width: 100%;
+      padding: 0.55rem 0.75rem;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--bg-surface);
+      color: var(--text-main);
+      font-family: inherit;
+      font-size: 0.85rem;
+    }
+
+    .checks-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.25rem;
+      margin: 1rem 0;
+      padding: 0.75rem;
+      border-radius: var(--radius-md);
+      background: var(--bg-alt);
+      border: 1px solid var(--border);
+    }
+    .check-label {
+      font-size: 0.82rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      cursor: pointer;
+    }
+
+    .btn {
+      padding: 0.65rem 1.25rem;
+      border-radius: var(--radius-sm);
+      font-size: 0.85rem;
+      font-weight: 700;
+      border: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-hover); }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-secondary { background: var(--bg-alt); border: 1px solid var(--border); color: var(--text-main); }
+    .btn-secondary:hover { border-color: var(--primary); }
+    .btn-success { background: var(--success); color: #fff; }
+
+    .run-status-card {
+      padding: 1rem;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border);
+      background: var(--bg-alt);
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+    }
+    .run-item {
+      padding: 0.75rem;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+    }
+    .badge-status {
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 0.2rem 0.5rem;
+      border-radius: 999px;
+      text-transform: uppercase;
+    }
+    .badge-queued { background: var(--warning-light); color: var(--warning); border: 1px solid var(--warning); }
+    .badge-in_progress { background: var(--primary-light); color: var(--primary); border: 1px solid var(--primary); }
+    .badge-success { background: var(--success-light); color: var(--success); border: 1px solid var(--success); }
+    .badge-failure { background: var(--danger-light); color: var(--danger); border: 1px solid var(--danger); }
+
+    .banner-alert {
+      padding: 0.75rem 1rem;
+      border-radius: var(--radius-md);
+      font-size: 0.82rem;
+      margin-bottom: 1rem;
+      display: none;
+    }
+    .banner-danger { background: var(--danger-light); color: var(--danger); border: 1px solid var(--danger); }
+    .banner-success { background: var(--success-light); color: var(--success); border: 1px solid var(--success); }
+  </style>
+</head>
+<body>
+
+  <header class="header-bar">
+    <div class="brand-group">
+      <div class="brand-icon">🐄</div>
+      <div>
+        <div style="display:flex; align-items:center; gap:0.5rem;">
+          <h1 class="brand-title">HitechDairy Data Onboarding</h1>
+          <span class="cloud-pill">⚡ Serverless Vercel + Actions</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="header-actions">
+      <div class="clock-badge" id="ist-clock">--:--:-- IST</div>
+      <button type="button" class="btn-toggle" id="theme-btn">🌙 Dark</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <div id="alert-banner" class="banner-alert"></div>
+
+    <div class="grid-2">
+      <!-- Card 1: File Upload & Module Selection -->
+      <section class="card">
+        <h2 class="card-title"><span class="step-badge">1</span> Upload & Inspect Workbook</h2>
+
+        <div class="dropzone" id="dropzone">
+          <div class="dropzone-icon">📁</div>
+          <div class="dropzone-text">Drop your Master Onboarding .xlsx here</div>
+          <div class="dropzone-hint">or click to browse from computer</div>
+          <input type="file" id="file-input" accept=".xlsx" style="display:none;" />
+        </div>
+
+        <div class="file-info-bar" id="file-info-bar" style="display:none;">
+          <div style="font-weight:700;" id="file-name-text">--</div>
+          <div style="color:var(--text-secondary);" id="file-size-text">-- KB</div>
+        </div>
+
+        <div style="margin-top:1.25rem;">
+          <label class="field-label">Select Module to Onboard:</label>
+          <div class="module-grid" id="module-grid">
+            <div class="module-chip active" data-module="Products">
+              <div class="module-chip-title">Products</div>
+              <div class="module-chip-count" id="count-Products">Pending file</div>
+            </div>
+            <div class="module-chip" data-module="Variants">
+              <div class="module-chip-title">Variants</div>
+              <div class="module-chip-count" id="count-Variants">Pending file</div>
+            </div>
+            <div class="module-chip" data-module="Customers">
+              <div class="module-chip-title">Customers</div>
+              <div class="module-chip-count" id="count-Customers">Pending file</div>
+            </div>
+            <div class="module-chip" data-module="Suppliers">
+              <div class="module-chip-title">Suppliers</div>
+              <div class="module-chip-count" id="count-Suppliers">Pending file</div>
+            </div>
+            <div class="module-chip" data-module="Farmers">
+              <div class="module-chip-title">Farmers</div>
+              <div class="module-chip-count" id="count-Farmers">Pending file</div>
+            </div>
+            <div class="module-chip" data-module="SalesInvoices">
+              <div class="module-chip-title">Sales Invoices</div>
+              <div class="module-chip-count" id="count-SalesInvoices">Pending file</div>
+            </div>
+            <div class="module-chip" data-module="AccountTransactions">
+              <div class="module-chip-title">Accounts</div>
+              <div class="module-chip-count" id="count-AccountTransactions">Pending file</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Card 2: Environment & Execution Settings -->
+      <section class="card">
+        <h2 class="card-title"><span class="step-badge">2</span> Target Environment & Settings</h2>
+
+        <div class="field-group">
+          <label class="field-label" for="env-select">Target ERP Environment</label>
+          <select id="env-select" class="select">
+            <option value="demo">Demo ERP (demo.hitechdairy.in)</option>
+            <option value="uat">UAT ERP (webuat.hitechdairy.in)</option>
+            <option value="prod">⚠️ Production ERP (hitechdairy.in)</option>
+          </select>
+        </div>
+
+        <div class="grid-2" style="margin-bottom:0.75rem;">
+          <div>
+            <label class="field-label" for="workers-count">Parallel Workers</label>
+            <select id="workers-count" class="select">
+              <option value="1">1 Worker (Sequential)</option>
+              <option value="2" selected>2 Workers (Parallel)</option>
+              <option value="3">3 Workers (Parallel)</option>
+              <option value="4">4 Workers (Parallel)</option>
+            </select>
+          </div>
+          <div>
+            <label class="field-label" for="limit-count">Batch Limit</label>
+            <input type="number" id="limit-count" class="input" placeholder="All records (0)" min="0" />
+          </div>
+        </div>
+
+        <div class="checks-row">
+          <label class="check-label" title="Retry failed entries automatically once before reporting failure">
+            <input type="checkbox" id="retry-failed" checked /> Retry Failed
+          </label>
+          <label class="check-label" title="Engage Groq AI autonomous diagnostics and self-healing for test failures">
+            <input type="checkbox" id="ai-intelligence" checked /> 🤖 AI Intelligence
+          </label>
+        </div>
+
+        <div style="margin-top:1.25rem; display:flex; gap:0.75rem; flex-wrap:wrap;">
+          <button type="button" id="trigger-btn" class="btn btn-primary" style="flex:1;">
+            🚀 Trigger Run on GitHub Actions
+          </button>
+          <button type="button" id="refresh-status-btn" class="btn btn-secondary">
+            🔄 Refresh Status
+          </button>
+        </div>
+      </section>
+    </div>
+
+    <!-- Card 3: Cloud Execution History & Results -->
+    <section class="card">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
+        <h2 class="card-title" style="margin-bottom:0;">
+          <span class="step-badge">3</span> GitHub Actions Execution Runs & Artifacts
+        </h2>
+        <a id="github-actions-link" href="https://github.com" target="_blank" class="btn btn-secondary" style="font-size:0.78rem; padding:0.35rem 0.75rem;">
+          ↗ Open GitHub Actions
+        </a>
+      </div>
+
+      <div class="run-status-card" id="runs-container">
+        <div style="color:var(--text-secondary); font-size:0.85rem; text-align:center; padding:1.5rem;">
+          Connecting to GitHub Actions status API...
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    // Theme toggle
+    const themeBtn = document.getElementById('theme-btn');
+    function applyTheme(theme) {
+      document.documentElement.setAttribute('data-theme', theme);
+      localStorage.setItem('onboarding-theme', theme);
+      themeBtn.textContent = theme === 'dark' ? '☀️ Light' : '🌙 Dark';
+    }
+    applyTheme(localStorage.getItem('onboarding-theme') || 'light');
+    themeBtn.addEventListener('click', () => {
+      const cur = document.documentElement.getAttribute('data-theme');
+      applyTheme(cur === 'dark' ? 'light' : 'dark');
+    });
+
+    // Clock
+    function updateClock() {
+      const d = new Date();
+      const str = new Intl.DateTimeFormat('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true
+      }).format(d);
+      document.getElementById('ist-clock').textContent = str.toUpperCase() + ' IST';
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // Module selection
+    let selectedModule = 'Products';
+    const moduleChips = document.querySelectorAll('.module-chip');
+    moduleChips.forEach(chip => {
+      chip.addEventListener('click', () => {
+        moduleChips.forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        selectedModule = chip.dataset.module;
+      });
+    });
+
+    // File handling
+    let currentFile = null;
+    let currentFileBase64 = null;
+    const dropzone = document.getElementById('dropzone');
+    const fileInput = document.getElementById('file-input');
+    const fileInfoBar = document.getElementById('file-info-bar');
+    const fileNameText = document.getElementById('file-name-text');
+    const fileSizeText = document.getElementById('file-size-text');
+    const alertBanner = document.getElementById('alert-banner');
+
+    function showAlert(msg, isError = false) {
+      alertBanner.textContent = msg;
+      alertBanner.className = `banner-alert ${isError ? 'banner-danger' : 'banner-success'}`;
+      alertBanner.style.display = msg ? 'block' : 'none';
+    }
+
+    dropzone.addEventListener('click', () => fileInput.click());
+    dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('dragover'); });
+    dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+    dropzone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropzone.classList.remove('dragover');
+      if (e.dataTransfer.files?.length) handleFile(e.dataTransfer.files[0]);
+    });
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files?.length) handleFile(fileInput.files[0]);
+    });
+
+    async function handleFile(file) {
+      if (!file || !file.name.toLowerCase().endsWith('.xlsx')) {
+        showAlert('Please upload a valid .xlsx file', true);
+        return;
+      }
+
+      currentFile = file;
+      fileNameText.textContent = file.name;
+      fileSizeText.textContent = `${(file.size / 1024).toFixed(1)} KB`;
+      fileInfoBar.style.display = 'flex';
+      showAlert(`Loaded workbook: ${file.name}`);
+
+      // Read base64
+      const buffer = await file.arrayBuffer();
+      let binary = '';
+      const bytes = new Uint8Array(buffer);
+      for (let i = 0; i < bytes.length; i += 8192) {
+        binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
+      }
+      currentFileBase64 = btoa(binary);
+
+      // Parse with SheetJS client-side
+      try {
+        const wb = XLSX.read(buffer, { type: 'array' });
+        const sheetMap = {
+          Products: ['Products', 'Product', 'PRODUCTS', 'ProductMaster'],
+          Variants: ['ProductVariants', 'Variants', 'Variant', 'Product_Variants'],
+          Customers: ['CustomerRegistration', 'Customers', 'Customer'],
+          Suppliers: ['SupplierRegistration', 'Suppliers', 'Supplier'],
+          Farmers: ['FarmerRegistration', 'Farmers', 'Farmer'],
+          SalesInvoices: ['SalesInvoice', 'SalesInvoices', 'Sales_Invoices', 'Invoice'],
+          AccountTransactions: ['AccountTransactions', 'Transactions', 'AccountTransaction']
+        };
+
+        for (const [mod, candidates] of Object.entries(sheetMap)) {
+          const matched = candidates.find(c => wb.SheetNames.includes(c));
+          const countEl = document.getElementById(`count-${mod}`);
+          if (matched && countEl) {
+            const sheet = wb.Sheets[matched];
+            const rows = XLSX.utils.sheet_to_json(sheet);
+            countEl.textContent = `${rows.length} rows found`;
+            countEl.style.color = 'var(--primary)';
+          } else if (countEl) {
+            countEl.textContent = 'Sheet not in file';
+            countEl.style.color = 'var(--text-secondary)';
+          }
+        }
+      } catch (err) {
+        console.warn('Local preview parse error:', err);
+      }
+    }
+
+    // Trigger Run
+    const triggerBtn = document.getElementById('trigger-btn');
+    triggerBtn.addEventListener('click', async () => {
+      showAlert('');
+      triggerBtn.disabled = true;
+      triggerBtn.textContent = '⏳ Dispatching to GitHub Actions...';
+
+      try {
+        const payload = {
+          module: selectedModule,
+          env: document.getElementById('env-select').value,
+          workers: Number(document.getElementById('workers-count').value || 2),
+          parallel: document.getElementById('workers-count').value !== '1',
+          retryFailed: document.getElementById('retry-failed').checked,
+          useAiIntelligence: document.getElementById('ai-intelligence').checked,
+          limit: document.getElementById('limit-count').value ? Number(document.getElementById('limit-count').value) : 0,
+          fileName: currentFile?.name,
+          fileBase64: currentFileBase64
+        };
+
+        const res = await fetch('/api/run', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.error || data.details || 'Failed to dispatch workflow');
+        }
+
+        showAlert(`🚀 Workflow dispatched! Run ID: ${data.runId}. Execution running in GitHub Actions.`);
+        setTimeout(fetchStatus, 3000);
+      } catch (err) {
+        showAlert(err.message, true);
+      } finally {
+        triggerBtn.disabled = false;
+        triggerBtn.textContent = '🚀 Trigger Run on GitHub Actions';
+      }
+    });
+
+    // Fetch Status & Runs
+    const runsContainer = document.getElementById('runs-container');
+    const ghLink = document.getElementById('github-actions-link');
+
+    async function fetchStatus() {
+      try {
+        const res = await fetch('/api/status');
+        const data = await res.json();
+
+        if (data.repository) {
+          ghLink.href = `https://github.com/${data.repository}/actions/workflows/onboard.yml`;
+        }
+
+        if (!data.configured) {
+          runsContainer.innerHTML = `
+            <div style="padding:1rem; background:var(--warning-light); color:var(--warning); border-radius:var(--radius-sm); font-size:0.85rem;">
+              ⚠️ <strong>GitHub Integration Pending:</strong> ${data.message}
+            </div>
+          `;
+          return;
+        }
+
+        if (!data.runs || data.runs.length === 0) {
+          runsContainer.innerHTML = `
+            <div style="color:var(--text-secondary); font-size:0.85rem; text-align:center; padding:1.2rem;">
+              No workflow runs found yet. Click <strong>Trigger Run</strong> above to launch your first execution!
+            </div>
+          `;
+          return;
+        }
+
+        runsContainer.innerHTML = data.runs.map(run => {
+          const statusClass = run.conclusion ? `badge-${run.conclusion}` : `badge-${run.status}`;
+          const statusText = run.conclusion || run.status;
+
+          const artifactButtons = (run.artifacts || []).map(a => `
+            <a href="${a.download_url}" target="_blank" class="btn btn-secondary" style="font-size:0.75rem; padding:0.3rem 0.65rem;">
+              📥 ${a.name} (${(a.size_in_bytes / (1024 * 1024)).toFixed(1)} MB)
+            </a>
+          `).join('');
+
+          return `
+            <div class="run-item">
+              <div>
+                <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.25rem;">
+                  <span class="badge-status ${statusClass}">${statusText}</span>
+                  <strong style="font-size:0.85rem;">Run #${run.runNumber}: ${run.name}</strong>
+                </div>
+                <div style="font-size:0.75rem; color:var(--text-secondary);">
+                  Started: ${new Date(run.createdAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST
+                </div>
+              </div>
+
+              <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+                ${artifactButtons}
+                <a href="${run.htmlUrl}" target="_blank" class="btn btn-secondary" style="font-size:0.75rem; padding:0.3rem 0.65rem;">
+                  ↗ Live Logs
+                </a>
+              </div>
+            </div>
+          `;
+        }).join('');
+      } catch (err) {
+        console.error('Failed to query status:', err);
+      }
+    }
+
+    document.getElementById('refresh-status-btn').addEventListener('click', fetchStatus);
+    fetchStatus();
+    setInterval(fetchStatus, 10000);
+  </script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+node_modules/
+test-results/
+playwright-report/
+blob-report/
+storageState*.json
+.env
+*.local
+docs/
+reports/
+Universal_AI_Agent/
+.playwright-mcp/
+debug.log
+variant-error-row-4.png
+eng.traineddata
+test-data/trash/
+*.lock
+*.md

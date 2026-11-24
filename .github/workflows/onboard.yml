@@ -1,0 +1,156 @@
+name: ERP Data Onboarding Runner
+
+on:
+  workflow_dispatch:
+    inputs:
+      module:
+        description: 'Module to onboard'
+        required: true
+        default: 'Products'
+        type: choice
+        options:
+          - Products
+          - Variants
+          - Customers
+          - Suppliers
+          - Farmers
+          - SalesInvoices
+          - AccountTransactions
+      env_target:
+        description: 'Target ERP Environment'
+        required: true
+        default: 'demo'
+        type: choice
+        options:
+          - demo
+          - uat
+          - prod
+      use_ai:
+        description: 'Enable Groq AI Autonomous Diagnostics'
+        required: true
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+      workers:
+        description: 'Worker count (parallel mode)'
+        required: true
+        default: '2'
+        type: choice
+        options:
+          - '1'
+          - '2'
+          - '3'
+          - '4'
+      parallel:
+        description: 'Parallel execution mode'
+        required: true
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+      retry_failed:
+        description: 'Retry failed records once'
+        required: true
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+      limit:
+        description: 'Batch limit (0 for all records)'
+        required: false
+        default: '0'
+      excel_file_path:
+        description: 'Path to Excel workbook'
+        required: true
+        default: 'test-data/Master_Onboarding_Template.xlsx'
+      run_id:
+        description: 'Triggering run identifier'
+        required: false
+        default: ''
+
+jobs:
+  onboarding:
+    name: "Run ${{ github.event.inputs.module }} (${{ github.event.inputs.env_target }})"
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: 📦 Install NPM Dependencies
+        run: npm ci
+
+      - name: 🎭 Install Playwright Browsers & OS Dependencies
+        run: npx playwright install --with-deps chromium
+
+      - name: 🔍 Verify Target Excel File
+        run: |
+          FILE="${{ github.event.inputs.excel_file_path }}"
+          echo "Checking Excel file at: $FILE"
+          if [ ! -f "$FILE" ]; then
+            echo "❌ Error: Target Excel file not found: $FILE"
+            exit 1
+          fi
+          echo "✅ Target Excel file is present: $(ls -lh "$FILE")"
+
+      - name: 🚀 Execute Multi-Worker Onboarding
+        env:
+          BASE_URL: ${{ github.event.inputs.env_target == 'prod' && 'https://hitechdairy.in' || (github.event.inputs.env_target == 'uat' && 'https://webuat.hitechdairy.in' || 'https://demo.hitechdairy.in') }}
+          ONBOARD_ENV_NAME: ${{ github.event.inputs.env_target }}
+          ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          USE_AI_INTELLIGENCE: ${{ github.event.inputs.use_ai }}
+          HEADLESS: 'true'
+          EXCEL_PATH: ${{ github.event.inputs.excel_file_path }}
+          FORCE_COLOR: '1'
+        run: |
+          # Build arguments
+          ARGS="src/onboarding.ts --module=${{ github.event.inputs.module }} --headless"
+
+          if [ "${{ github.event.inputs.parallel }}" = "true" ]; then
+            ARGS="$ARGS --parallel --workers=${{ github.event.inputs.workers }}"
+          else
+            ARGS="$ARGS --sequential"
+          fi
+
+          if [ "${{ github.event.inputs.retry_failed }}" = "true" ]; then
+            ARGS="$ARGS --retry-failed"
+          fi
+
+          if [ "${{ github.event.inputs.use_ai }}" = "true" ]; then
+            ARGS="$ARGS --use-ai"
+          else
+            ARGS="$ARGS --no-ai"
+          fi
+
+          LIMIT="${{ github.event.inputs.limit }}"
+          if [ -n "$LIMIT" ] && [ "$LIMIT" -gt 0 ] 2>/dev/null; then
+            ARGS="$ARGS --limit=$LIMIT"
+          fi
+
+          echo "Running: npx tsx $ARGS"
+          npx tsx $ARGS
+
+      - name: 📊 Upload Updated Excel Workbook & HTML Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: onboarding-results-${{ github.event.inputs.module }}-${{ github.run_number }}
+          path: |
+            ${{ github.event.inputs.excel_file_path }}
+            reports/
+            test-results/
+          retention-days: 30
+          if-no-files-found: warn
