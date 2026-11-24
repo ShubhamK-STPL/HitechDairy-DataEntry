@@ -99,14 +99,17 @@ export class BasePage {
     console.log(`[selectVisibleOptionWithSearch] Started. Search text: "${searchText}", Option text: "${optionText}"`);
     await this.waitForStep();
 
-    const searchInput = this.page.locator("xpath=//input[@type='text' and contains(@placeholder,'Search') and not(@placeholder='Search Page Name')]").last();
+    const searchInput = this.page.locator(
+      'ngx-mat-select-search input, input[aria-label*="search" i], input[placeholder*="search" i]:not([placeholder="Search Page Name"])'
+    ).last();
 
-    const isSearchVisible = await searchInput.isVisible().catch(() => false);
+    const isSearchVisible = await searchInput.isVisible({ timeout: 1500 }).catch(() => false);
     if (isSearchVisible) {
       console.log(`[selectVisibleOptionWithSearch] Typing search text: "${searchText}"...`);
+      await searchInput.click({ force: true }).catch(() => {});
       await searchInput.fill('');
-      await searchInput.pressSequentially(searchText, { delay: 10 });
-      await this.waitForStep();
+      await searchInput.fill(searchText);
+      await this.waitForStep(200);
     }
 
     console.log(`[selectVisibleOptionWithSearch] Clicking option matching: "${optionText}"...`);

@@ -163,15 +163,26 @@ export class FarmerRegistrationPage extends BasePage {
       }
     }
 
-    const overlay = this.page.locator('.cdk-overlay-container, mat-select-panel, .mat-mdc-select-panel');
+    const overlay = this.page.locator(
+      '.cdk-overlay-container .mat-mdc-select-panel:visible, .cdk-overlay-pane:has(mat-option) .mat-mdc-select-panel:visible, .cdk-overlay-container, mat-select-panel, .mat-mdc-select-panel'
+    ).first();
     await overlay.locator('mat-option, [role="option"]').first().waitFor({ state: 'visible', timeout: timeoutMs }).catch(() => {});
 
-    // If dropdown contains a search box (e.g. Bank or large list), type into it to avoid picking wrong items
-    const searchInput = overlay.locator("xpath=.//input[@type='text' and (contains(@placeholder,'Search') or contains(@aria-label,'Search'))]").first();
+    // If dropdown contains a search box (e.g. ngx-mat-select-search for Bank or Route), focus and type into it
+    const searchInput = overlay.locator(
+      'ngx-mat-select-search input, input[aria-label*="search" i], input[placeholder*="search" i]'
+    ).first();
+    let hasTypedSearch = false;
+
     if (await searchInput.isVisible({ timeout: 1000 }).catch(() => false)) {
-      await searchInput.fill('');
-      await searchInput.pressSequentially(cleanOption, { delay: 10 });
-      await this.waitForStep(200);
+      const isEnabled = await searchInput.isEnabled().catch(() => false);
+      if (isEnabled) {
+        await searchInput.click({ force: true }).catch(() => {});
+        await searchInput.fill('');
+        await searchInput.fill(cleanOption);
+        hasTypedSearch = true;
+        await this.waitForStep(200);
+      }
     }
 
     const escaped = this.escapeRegExp(cleanOption);
@@ -179,6 +190,16 @@ export class FarmerRegistrationPage extends BasePage {
     let option = overlay.locator('mat-option, [role="option"]').filter({
       hasText: new RegExp(`^\\s*${escaped}\\s*$`, 'i')
     }).first();
+
+    // If search filter resulted in 0 options, clear search input so all options reappear
+    if ((await option.count()) === 0 && hasTypedSearch) {
+      const optionCount = await overlay.locator('mat-option, [role="option"]').count().catch(() => 0);
+      if (optionCount === 0) {
+        await searchInput.click({ force: true }).catch(() => {});
+        await searchInput.fill('');
+        await this.waitForStep(200);
+      }
+    }
 
     // If exact match not found (e.g. Route "Gardi (1000)" vs "Gardi"), match boundary before loose substring
     if ((await option.count()) === 0) {
