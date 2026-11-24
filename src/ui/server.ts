@@ -8,6 +8,7 @@ import { getModuleAdapter } from '../services/ModuleAdapters';
 import type { OnboardingModuleName } from '../config/workers';
 import { assertExcelFileWritable, resolveSheetName } from '../utils/excelSheetHelper';
 import { formatIst12Hr, formatIstTimeOnly12Hr } from '../utils/timeFormat';
+import { runFarmerVerification } from '../../scripts/verify-farmer-records';
 
 const xlsx = (xlsxPkg as any).default || xlsxPkg;
 
@@ -185,7 +186,7 @@ function listTestDataFiles(): string[] {
     .sort((a, b) => a.localeCompare(b));
 }
 
-function inspectWorkbook(absPath: string) {
+export function inspectWorkbook(absPath: string) {
   let writable = true;
   let lockError = '';
   try {
@@ -348,6 +349,27 @@ function startOnboardingRun(params: RunParams): void {
 
     if (params.parallel && (!Number.isFinite(params.workers) || params.workers < 1 || params.workers > 8)) {
       throw new Error('Worker count must be between 1 and 8 for parallel execution.');
+    }
+
+    // Compulsory pre-validation check for Farmers module
+    if (params.module === 'Farmers') {
+      try {
+        const verifyResult = runFarmerVerification(absExcelPath);
+        if (verifyResult.duplicateMobiles.length > 0) {
+          const totalAffected = verifyResult.duplicateMobiles.reduce((acc, m) => acc + m.count, 0);
+          const sampleList = verifyResult.duplicateMobiles
+            .slice(0, 5)
+            .map((m) => `${m.mobile} (${m.count} rows: ${m.farmers.map((f) => `Row ${f.row}`).join(', ')})`)
+            .join('; ');
+          throw new Error(
+            `[Pre-Validation Blocked] Detected ${verifyResult.duplicateMobiles.length} duplicate mobile number(s) in Excel across ${totalAffected} farmers. ` +
+            `Duplicate mobile numbers are strictly prohibited. Details: ${sampleList}. ` +
+            `Audit report generated at reports/farmer_pre_validation_report.html`
+          );
+        }
+      } catch (err: any) {
+        throw new Error(err.message || 'Farmer pre-validation audit failed.');
+      }
     }
   }
 
@@ -696,35 +718,43 @@ function openInBrowser(url: string): void {
 
 let triedFallbackPort = false;
 
-server.on('error', async (err: NodeJS.ErrnoException) => {
-  if (err.code === 'EADDRINUSE') {
-    const existingUrl = `http://127.0.0.1:${PORT}`;
-    try {
-      const probe = await fetch(`${existingUrl}/api/files`);
-      if (probe.ok) {
-        console.log(`\n✅ Data Runner UI is already running at: ${existingUrl}`);
-        openInBrowser(existingUrl);
-        process.exit(0);
+export function startServer(port: number = PORT): http.Server {
+  server.on('error', async (err: NodeJS.ErrnoException) => {
+    if (err.code === 'EADDRINUSE') {
+      const existingUrl = `http://127.0.0.1:${port}`;
+      try {
+        const probe = await fetch(`${existingUrl}/api/files`);
+        if (probe.ok) {
+          console.log(`\n✅ Data Runner UI is already running at: ${existingUrl}`);
+          openInBrowser(existingUrl);
+          process.exit(0);
+        }
+      } catch {}
+
+      if (!triedFallbackPort) {
+        triedFallbackPort = true;
+        console.warn(`⚠️ Port ${port} is busy; starting on an available port...`);
+        server.listen(0, '127.0.0.1');
+        return;
       }
-    } catch {}
-
-    if (!triedFallbackPort) {
-      triedFallbackPort = true;
-      console.warn(`⚠️ Port ${PORT} is busy; starting on an available port...`);
-      server.listen(0, '127.0.0.1');
-      return;
     }
-  }
-  console.error(`\n❌ Failed to start UI server: ${err.message}`);
-  process.exit(1);
-});
+    console.error(`\n❌ Failed to start UI server: ${err.message}`);
+    process.exit(1);
+  });
 
-server.listen(PORT, '127.0.0.1', () => {
-  const addr = server.address();
-  const activePort = typeof addr === 'object' && addr ? addr.port : PORT;
-  const url = `http://127.0.0.1:${activePort}`;
-  console.log(`\n🚀 Data Runner UI is live at: ${url}`);
-  console.log(`   Workspace : ${WORKSPACE_ROOT}`);
-  console.log(`   Excel Dir : ${TEST_DATA_DIR}\n`);
-  openInBrowser(url);
-});
+  server.listen(port, '127.0.0.1', () => {
+    const addr = server.address();
+    const activePort = typeof addr === 'object' && addr ? addr.port : port;
+    const url = `http://127.0.0.1:${activePort}`;
+    console.log(`\n🚀 Data Runner UI is live at: ${url}`);
+    console.log(`   Workspace : ${WORKSPACE_ROOT}`);
+    console.log(`   Excel Dir : ${TEST_DATA_DIR}\n`);
+    openInBrowser(url);
+  });
+
+  return server;
+}
+
+if (require.main === module || process.argv[1]?.endsWith('server.ts')) {
+  startServer();
+}

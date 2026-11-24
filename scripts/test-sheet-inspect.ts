@@ -1,8 +1,9 @@
-import { inspectExcelFile } from '../src/ui/server';
+import path from 'node:path';
+import { inspectWorkbook } from '../src/ui/server';
 
 console.log('🔍 Inspecting: test-data/Jay Hanuman Master Data 1.xlsx');
 try {
-  const result = inspectExcelFile('test-data/Jay Hanuman Master Data 1.xlsx');
+  const result = inspectWorkbook(path.resolve('test-data/Jay Hanuman Master Data 1.xlsx'));
   const farmerModule = result.modules.find(m => m.module === 'Farmers');
   
   console.log('\n📊 Result for Farmers Module:');

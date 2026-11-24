@@ -11,6 +11,7 @@ import { buildFullSheetReportRecords } from './services/OnboardingReportBuilder'
 import { CustomHistoryReporter, type TestRecordSummary } from './utils/CustomHistoryReporter';
 import { assertExcelFileWritable } from './utils/excelSheetHelper';
 import { DummyMobileAllocator } from './utils/dummyMobileAllocator';
+import { runFarmerVerification } from '../scripts/verify-farmer-records';
 
 /**
  * Clears any stale session state file and runs the Playwright login setup test
@@ -106,6 +107,23 @@ async function main() {
   }
 
   assertExcelFileWritable(settings.excelPath);
+
+  // Compulsory pre-validation check for Farmers module
+  if (settings.module === 'Farmers') {
+    const verifyResult = runFarmerVerification(settings.excelPath);
+    if (verifyResult.duplicateMobiles.length > 0) {
+      const totalAffected = verifyResult.duplicateMobiles.reduce((acc, m) => acc + m.count, 0);
+      const sampleList = verifyResult.duplicateMobiles
+        .slice(0, 5)
+        .map((m) => `${m.mobile} (${m.count} rows: ${m.farmers.map((f) => `Row ${f.row}`).join(', ')})`)
+        .join('; ');
+      throw new Error(
+        `\n🚨 [Pre-Validation Blocked] Detected ${verifyResult.duplicateMobiles.length} duplicate mobile number(s) in Excel across ${totalAffected} farmers.\n` +
+        `Duplicate mobile numbers are strictly prohibited. Details: ${sampleList}.\n` +
+        `Full audit report available at: reports/farmer_pre_validation_report.html\n`
+      );
+    }
+  }
 
   process.env.USE_AI_INTELLIGENCE = settings.useAiIntelligence ? 'true' : 'false';
 
