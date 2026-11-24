@@ -396,10 +396,11 @@ export class FarmerRegistrationPage extends BasePage {
     }
 
     // ---------------------------------------------------------
-    // 4. BANK DETAILS (optional fill only if excel has value)
+    // 4. BANK DETAILS (skip all fields if Select Bank is empty)
     // ---------------------------------------------------------
-    if (farmer.bankName && (await this.eleUtil.isVisible(this.bankSelect, 1500))) {
-      await this.selectMatOption(this.bankSelect, farmer.bankName);
+    const hasBank = Boolean(farmer.bankName && farmer.bankName.trim());
+    if (hasBank && (await this.eleUtil.isVisible(this.bankSelect, 1500))) {
+      await this.selectMatOption(this.bankSelect, farmer.bankName!.trim());
       await this.waitForStep(400);
 
       // Account Holder Name (enabled after bank selection)
@@ -426,6 +427,8 @@ export class FarmerRegistrationPage extends BasePage {
       if (farmer.branchName && (await this.eleUtil.isVisible(this.branchNameInput, 1500))) {
         await this.eleUtil.fill(this.branchNameInput, farmer.branchName.trim());
       }
+    } else {
+      console.log('ℹ️ Select Bank is empty. Skipping Account Holder Name, Account Type, Account Number, IFSC Code, and Branch Name.');
     }
 
     // ---------------------------------------------------------

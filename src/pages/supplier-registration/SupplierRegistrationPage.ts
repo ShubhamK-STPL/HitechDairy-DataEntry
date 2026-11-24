@@ -276,9 +276,10 @@ export class SupplierRegistrationPage extends BasePage {
       await this.eleUtil.fill(this.addressTextarea, addressText);
     }
 
-    // 4. Bank Details - optional fill only if excel has value
-    if (record.bankName) {
-      await this.selectMatOption(this.bankSelect, record.bankName);
+    // 4. Bank Details (skip all fields if Select Bank is empty)
+    const hasBank = Boolean(record.bankName && record.bankName.trim());
+    if (hasBank) {
+      await this.selectMatOption(this.bankSelect, record.bankName!.trim());
 
       if (record.accountHolderName && (await this.accountHolderNameInput.isEnabled())) {
         await this.eleUtil.fill(this.accountHolderNameInput, record.accountHolderName);
@@ -306,6 +307,8 @@ export class SupplierRegistrationPage extends BasePage {
         const bankSection = this.page.locator('.page-heading:has-text("Bank Details") + .row');
         await this.uploadDocument(bankSection, record.passbookChequeFile);
       }
+    } else {
+      console.log('ℹ️ Select Bank is empty. Skipping Account Holder Name, Account Type, Account Number, IFSC Code, and Branch Name.');
     }
 
     // 5. Additional Details - optional fill only if excel has value

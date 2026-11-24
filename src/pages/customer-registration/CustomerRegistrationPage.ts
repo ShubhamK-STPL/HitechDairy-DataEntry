@@ -312,10 +312,11 @@ export class CustomerRegistrationPage extends BasePage {
     }
 
     // ---------------------------------------------------------
-    // 3. BANK DETAILS (optional fill only if excel has value)
+    // 3. BANK DETAILS (skip all fields if Select Bank is empty)
     // ---------------------------------------------------------
-    if (customer.bankName && (await this.eleUtil.isVisible(this.bankSelect, 1500))) {
-      await this.selectMatOption(this.bankSelect, customer.bankName);
+    const hasBank = Boolean(customer.bankName && customer.bankName.trim());
+    if (hasBank && (await this.eleUtil.isVisible(this.bankSelect, 1500))) {
+      await this.selectMatOption(this.bankSelect, customer.bankName!.trim());
       await this.waitForStep(400);
 
       if (customer.accountHolderName && (await this.eleUtil.isVisible(this.accountHolderNameInput, 1500))) {
@@ -339,6 +340,8 @@ export class CustomerRegistrationPage extends BasePage {
       if (customer.branchName && (await this.eleUtil.isVisible(this.branchNameInput, 1500))) {
         await this.eleUtil.fill(this.branchNameInput, customer.branchName.trim());
       }
+    } else {
+      console.log('ℹ️ Select Bank is empty. Skipping Account Holder Name, Account Type, Account Number, IFSC Code, and Branch Name.');
     }
 
     // ---------------------------------------------------------

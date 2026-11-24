@@ -153,13 +153,15 @@ function normalizeFarmerRow(row: Record<string, any>, index: number): FarmerReco
   ]);
   const accountCode = rawCode.replace(/\.0$/, '').trim();
 
-  // 4. Bank Details
-  const bankName = getField(['Select Bank', 'Bank Name', 'Bank']);
-  const accountHolderName = getField(['Account Holder Name', 'Holder Name']);
-  const accountType = getField(['Account Type', 'Bank Account Type']);
-  const accountNumber = getField(['Account Number', 'Bank Account Number', 'Account No']);
-  const ifscCode = getField(['IFSC Code', 'IFSC']);
-  const branchName = getField(['Branch Name', 'Branch']);
+  // 4. Bank Details (skip all following fields if Select Bank is empty)
+  const rawBankName = getField(['Select Bank', 'Bank Name', 'Bank']);
+  const hasBank = Boolean(rawBankName && rawBankName.trim());
+  const bankName = hasBank ? rawBankName.trim() : '';
+  const accountHolderName = hasBank ? getField(['Account Holder Name', 'Holder Name']) : '';
+  const accountType = hasBank ? getField(['Account Type', 'Bank Account Type']) : '';
+  const accountNumber = hasBank ? getField(['Account Number', 'Bank Account Number', 'Account No']) : '';
+  const ifscCode = hasBank ? getField(['IFSC Code', 'IFSC']).toUpperCase() : '';
+  const branchName = hasBank ? getField(['Branch Name', 'Branch']) : '';
 
   // 5. Additional Details
   const panNo = getField(['PAN No.', 'PAN No', 'PAN Number', 'PAN']);

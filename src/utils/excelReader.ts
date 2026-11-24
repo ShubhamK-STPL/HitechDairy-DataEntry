@@ -82,9 +82,15 @@ function normalizeSupplierRow(row: Record<string, any>, index: number): Supplier
   const cleanMobile = rawMobile.replace(/\D/g, '').slice(-10);
   const resolvedName = supplierName || regionalName;
   const addressVal = getField(['Address', 'addressDetails', 'Street Address']);
-  const accNoVal = getField(['Account Number', 'accountNo', 'Acc No']).replace(/[^a-zA-Z0-9]/g, '');
+  const rawBankVal = getField(['Select Bank', 'Bank', 'Bank Name', 'bankId']);
+  const hasBank = Boolean(rawBankVal && rawBankVal.trim());
+  const accNoVal = hasBank ? getField(['Account Number', 'accountNo', 'Acc No']).replace(/[^a-zA-Z0-9]/g, '') : '';
   const aadharVal = getField(['Aadhar Number', 'Aadhar', 'aadharNo', 'Adhar', 'UID']).replace(/\D/g, '').slice(0, 12);
-  const accTypeVal = getField(['Account Type', 'bankAccType', 'Acc Type']) as any;
+  const accTypeVal = hasBank ? (getField(['Account Type', 'bankAccType', 'Acc Type']) as any) : '';
+  const accHolderVal = hasBank ? getField(['Account Holder Name', 'accountHolderName', 'Holder Name']) : '';
+  const ifscVal = hasBank ? getField(['IFSC Code', 'ifscCode', 'IFSC']).toUpperCase() : '';
+  const branchVal = hasBank ? getField(['Branch Name', 'branchName', 'Branch']) : '';
+  const passbookChequeVal = hasBank ? getField(['Passbook-Cheque', 'Passbook', 'Cheque', 'passbookChequeFile']) : '';
 
   return {
     // 1. Basic Details
@@ -108,16 +114,16 @@ function normalizeSupplierRow(row: Record<string, any>, index: number): Supplier
     addressDetails: addressVal,
     address: addressVal,
 
-    // 3. Bank Details (optional fill only if excel has value)
-    bankName: getField(['Select Bank', 'Bank', 'Bank Name', 'bankId']),
-    accountHolderName: getField(['Account Holder Name', 'accountHolderName', 'Holder Name']),
+    // 3. Bank Details (skip all following fields if Select Bank is empty)
+    bankName: hasBank ? rawBankVal.trim() : '',
+    accountHolderName: accHolderVal,
     bankAccType: accTypeVal,
     accountType: accTypeVal,
     accountNo: accNoVal,
     accountNumber: accNoVal,
-    ifscCode: getField(['IFSC Code', 'ifscCode', 'IFSC']).toUpperCase(),
-    branchName: getField(['Branch Name', 'branchName', 'Branch']),
-    passbookChequeFile: getField(['Passbook-Cheque', 'Passbook', 'Cheque', 'passbookChequeFile']),
+    ifscCode: ifscVal,
+    branchName: branchVal,
+    passbookChequeFile: passbookChequeVal,
 
     // 4. Additional Details (optional fill only if excel has value)
     panNo: getField(['PAN No.', 'PAN No', 'PAN', 'panNo', 'PAN Number']).toUpperCase(),

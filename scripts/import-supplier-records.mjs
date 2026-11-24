@@ -182,12 +182,14 @@ async function runSupplierImport() {
       const town = getVal(row, ['Search Town/Village', 'Town', 'Village']);
       const address = getVal(row, ['Address', 'addressDetails']);
 
-      const bank = getVal(row, ['Select Bank', 'Bank']);
-      const accHolder = getVal(row, ['Account Holder Name']);
-      const accType = getVal(row, ['Account Type']);
-      const accNo = getVal(row, ['Account Number', 'accountNo']);
-      const ifsc = getVal(row, ['IFSC Code', 'ifscCode']);
-      const branch = getVal(row, ['Branch Name']);
+      const rawBank = getVal(row, ['Select Bank', 'Bank']);
+      const hasBank = Boolean(rawBank && rawBank.trim());
+      const bank = hasBank ? rawBank.trim() : '';
+      const accHolder = hasBank ? getVal(row, ['Account Holder Name']) : '';
+      const accType = hasBank ? getVal(row, ['Account Type']) : '';
+      const accNo = hasBank ? getVal(row, ['Account Number', 'accountNo']) : '';
+      const ifsc = hasBank ? getVal(row, ['IFSC Code', 'ifscCode']) : '';
+      const branch = hasBank ? getVal(row, ['Branch Name']) : '';
 
       const pan = getVal(row, ['PAN No.', 'PAN']);
       const aadhar = getVal(row, ['Aadhar Number', 'Aadhar', 'Adhar']);

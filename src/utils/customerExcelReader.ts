@@ -120,8 +120,13 @@ function normalizeCustomerRow(row: Record<string, any>, _index: number): Custome
   const address = getField(['Address', 'addressDetails', 'Street Address']);
 
   // Bank
-  const accNo = getField(['Account Number', 'accountNo', 'Acc No']).replace(/[^a-zA-Z0-9]/g, '');
-  const accType = getField(['Account Type', 'bankAccType', 'Acc Type']) as any;
+  const rawBank = getField(['Select Bank', 'Bank', 'Bank Name', 'bankId']);
+  const hasBank = Boolean(rawBank && rawBank.trim());
+  const accNo = hasBank ? getField(['Account Number', 'accountNo', 'Acc No']).replace(/[^a-zA-Z0-9]/g, '') : '';
+  const accType = hasBank ? (getField(['Account Type', 'bankAccType', 'Acc Type']) as any) : '';
+  const accHolder = hasBank ? getField(['Account Holder Name', 'accountHolderName', 'Holder Name']) : '';
+  const ifsc = hasBank ? getField(['IFSC Code', 'ifscCode', 'IFSC']).toUpperCase() : '';
+  const branch = hasBank ? getField(['Branch Name', 'branchName', 'Branch']) : '';
 
   // Additional
   const aadhar = getField(['Aadhar Number', 'Aadhar', 'aadharNo', 'Adhar', 'UID']).replace(/\D/g, '').slice(0, 12);
@@ -152,15 +157,15 @@ function normalizeCustomerRow(row: Record<string, any>, _index: number): Custome
     address,
     addressDetails: address,
 
-    // 3. Bank Details (optional)
-    bankName: getField(['Select Bank', 'Bank', 'Bank Name', 'bankId']),
-    accountHolderName: getField(['Account Holder Name', 'accountHolderName', 'Holder Name']),
+    // 3. Bank Details (skip all following fields if Select Bank is empty)
+    bankName: hasBank ? rawBank.trim() : '',
+    accountHolderName: accHolder,
     accountType: accType,
     bankAccType: accType,
     accountNumber: accNo,
     accountNo: accNo,
-    ifscCode: getField(['IFSC Code', 'ifscCode', 'IFSC']).toUpperCase(),
-    branchName: getField(['Branch Name', 'branchName', 'Branch']),
+    ifscCode: ifsc,
+    branchName: branch,
 
     // 4. Additional Details (optional)
     panNo: getField(['PAN No.', 'PAN', 'panNo', 'PAN Number']).toUpperCase(),
