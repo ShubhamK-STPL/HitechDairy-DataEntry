@@ -11,6 +11,7 @@ on:
         options:
           - Products
           - Variants
+          - VariantsV2
           - Customers
           - Suppliers
           - Farmers
