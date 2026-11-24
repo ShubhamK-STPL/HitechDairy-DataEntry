@@ -2,6 +2,7 @@ import { Page, Locator, expect } from '@playwright/test';
 import { BasePage } from './BasePage';
 import { CaptchaSolver } from '../utils/captchaSolver';
 import { ENV } from '../config/envConfig';
+import { DummyMobileAllocator } from '../utils/dummyMobileAllocator';
 
 export interface LoginCredentials {
   username?: string;
@@ -32,17 +33,31 @@ export class LoginPage extends BasePage {
   }
 
   async goto(url: string = ENV.LOGIN_URL): Promise<this> {
+    const fYearPromise = this.page.waitForResponse(
+      (res) => res.url().includes('GetFinancialYear') && res.status() === 200,
+      { timeout: 15000 }
+    ).catch(() => null);
+
     await this.page.goto(url, { waitUntil: 'domcontentloaded' });
     await expect(this.loginButton).toBeVisible({ timeout: 15000 });
+
+    // Wait for GetFinancialYear response so dropdown is populated
+    const fYearResponse = await fYearPromise;
+    if (fYearResponse) {
+      console.log('📅 [LoginPage] MasterDropdown/GetFinancialYear response received.');
+    } else {
+      console.log('ℹ️ [LoginPage] Proceeding after DOM ready (GetFinancialYear already loaded or cached).');
+    }
+
     await this.waitForStep();
     return this;
   }
 
   async selectFinancialYear(year: string): Promise<this> {
-        await this.eleUtil.click(this.financialYearSelect);
+    // Ensure dropdown has options loaded before opening
+    await this.financialYearSelect.waitFor({ state: 'attached', timeout: 10000 });
+    await this.eleUtil.click(this.financialYearSelect);
     await this.selectVisibleOption(year);
-
-
     return this;
   }
 
@@ -115,13 +130,26 @@ export class LoginPage extends BasePage {
     await this.enterPassword(password);
     await this.solveAndEnterCaptcha();
 
-    await Promise.all([
+    const [loginResponse] = await Promise.all([
       this.page.waitForResponse(
         (res) => res.url().includes('Login/UserLogin') && res.status() === 200,
         { timeout: 15000 }
       ).catch(() => null),
       this.clickLogin(),
     ]);
+
+    if (loginResponse) {
+      try {
+        const text = await loginResponse.text().catch(() => '');
+        if (text) {
+          const body = JSON.parse(text);
+          const orgId = body?.responseData?.organizationId ?? body?.organizationId;
+          if (orgId !== undefined && orgId !== null) {
+            DummyMobileAllocator.setOrganizationId(orgId);
+          }
+        }
+      } catch {}
+    }
 
     await this.page.waitForURL((url) => !url.href.includes('login'), { timeout: 15000 });
   }

@@ -661,9 +661,35 @@
               <label><input type="checkbox" id="retry-failed" /> Retry Failed</label>
               <label><input type="checkbox" id="headed-mode" /> Show Browser</label>
               <label title="Enable Groq AI Autonomous diagnostics and self-healing for test failures"><input type="checkbox" id="ai-intelligence" checked /> AI Intelligence</label>
+              <label title="Auto-generate or increment dummy mobile numbers for customer/supplier/farmer onboarding"><input type="checkbox" id="dummy-mobile" /> Allow Dummy Mobile</label>
             </div>
           </div>
         </div>
+
+        <div id="dummy-mobile-config" style="display:none; margin-bottom:0.85rem; padding:0.75rem; border-radius:8px; background:var(--surface-subtle); border:1px solid var(--border);">
+          <label class="field-label" for="start-mobile-input" style="margin-bottom:0.35rem;">
+            Starting Dummy Mobile Number (Optional)
+          </label>
+          <input type="text" id="start-mobile-input" maxlength="10" placeholder="Defaults to 600{orgId}0001 (e.g. 6004170001)" />
+          <div style="font-size:0.75rem; color:var(--muted); margin-top:0.35rem;">
+            If empty, the system automatically uses <code>600{orgId}0001</code> from the login session (3-digit orgId, last 4 digits starting at 0001) and increments per record. You can also specify any 10-digit starting number here.
+          </div>
+        </div>
+
+        <details id="fyear-details" style="margin-bottom:0.85rem; border:1px solid var(--border); border-radius:8px; padding:0.6rem 0.75rem; background:var(--surface-subtle);">
+          <summary style="cursor:pointer; font-size:0.82rem; font-weight:600; color:var(--text-secondary); user-select:none; display:flex; align-items:center; gap:0.4rem;">
+            <span>📅 Custom GetFinancialYear Response (Expand / Collapse)</span>
+          </summary>
+          <div style="margin-top:0.65rem;">
+            <label class="field-label" for="fyear-response-input" style="margin-bottom:0.3rem;">
+              Mock JSON Response for <code>MasterDropdown/GetFinancialYear</code>
+            </label>
+            <textarea id="fyear-response-input" rows="4" placeholder='Optional. Leave blank to use live portal API. E.g. {"statusCode":"200","statusMessage":"Success","responseData":[{"id":6,"yearName":"2026-2027","isCurrentYear":1}]}' style="width:100%; font-family:var(--font-mono); font-size:0.75rem; border:1px solid var(--border); border-radius:6px; padding:0.4rem 0.5rem; background:var(--surface); color:var(--text); resize:vertical;"></textarea>
+            <div style="font-size:0.72rem; color:var(--muted); margin-top:0.25rem;">
+              Paste API JSON here if the live portal environment fails to return financial years. If left blank, the live portal response will be used.
+            </div>
+          </div>
+        </details>
 
         <div id="run-validation-error" class="validation-banner"></div>
 
@@ -710,7 +736,31 @@
         <div class="kpi"><div class="kpi-label">Skipped</div><div class="kpi-val" style="color:var(--warning);" id="kpi-skipped">0</div></div>
       </div>
 
-      <pre id="console-log">Ready. Select workbook and module to begin.</pre>
+      <!-- Live Execution Progress Bar -->
+      <div id="live-progress-container" style="display:none; margin-bottom:1rem; padding:0.75rem 1rem; background:var(--surface-subtle); border:1px solid var(--border); border-radius:8px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.8rem; font-weight:700; margin-bottom:0.45rem;">
+          <span id="live-progress-label" style="color:var(--text);">Processing records...</span>
+          <span id="live-progress-percent" style="color:var(--primary); font-family:var(--font-mono);">0%</span>
+        </div>
+        <div style="background:var(--border); border-radius:999px; height:8px; overflow:hidden;">
+          <div id="live-progress-bar" style="background:linear-gradient(90deg, var(--primary), #3b82f6); height:100%; width:0%; transition:width 0.25s ease;"></div>
+        </div>
+      </div>
+
+      <!-- View Switcher Tabs -->
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.6rem; flex-wrap:wrap; gap:0.5rem;">
+        <div style="display:flex; gap:0.35rem;">
+          <button type="button" id="tab-json-btn" class="btn btn-primary" style="padding:0.3rem 0.75rem; font-size:0.78rem;">⚡ Execution JSON</button>
+          <button type="button" id="tab-raw-btn" class="btn btn-secondary" style="padding:0.3rem 0.75rem; font-size:0.78rem;">📜 Terminal Log</button>
+        </div>
+        <span id="live-worker-badge" style="font-size:0.75rem; font-weight:600; color:var(--text-secondary); font-family:var(--font-mono);"></span>
+      </div>
+
+      <!-- Live Execution JSON Stream (Default View: zero DOM lag) -->
+      <pre id="execution-json-view" style="font-family:var(--font-mono); font-size:0.8rem; line-height:1.45; background:var(--surface-subtle); border:1px solid var(--border); border-radius:8px; padding:0.85rem; max-height:380px; overflow-y:auto; color:var(--text); margin:0;">Ready. Select workbook and module to begin.</pre>
+
+      <!-- Raw Terminal Log (Throttled & Capped) -->
+      <pre id="console-log" style="display:none; font-family:var(--font-mono); font-size:0.8rem; line-height:1.45; background:var(--surface-subtle); border:1px solid var(--border); border-radius:8px; padding:0.85rem; max-height:380px; overflow-y:auto; color:var(--text); margin:0;">Ready. Select workbook and module to begin.</pre>
     </section>
   </main>
 
@@ -735,11 +785,23 @@
     const retryEl = document.getElementById('retry-failed');
     const headedEl = document.getElementById('headed-mode');
     const aiIntelligenceEl = document.getElementById('ai-intelligence');
+    const dummyMobileEl = document.getElementById('dummy-mobile');
+    const dummyMobileConfigEl = document.getElementById('dummy-mobile-config');
+    const startMobileInput = document.getElementById('start-mobile-input');
+    const fyearResponseInput = document.getElementById('fyear-response-input');
     const runBtn = document.getElementById('run-btn');
     const syncBtn = document.getElementById('sync-btn');
     const stopBtn = document.getElementById('stop-btn');
     const openReportLink = document.getElementById('open-report-link');
     const consoleLogEl = document.getElementById('console-log');
+    const executionJsonView = document.getElementById('execution-json-view');
+    const liveProgressContainer = document.getElementById('live-progress-container');
+    const liveProgressBar = document.getElementById('live-progress-bar');
+    const liveProgressPercent = document.getElementById('live-progress-percent');
+    const liveProgressLabel = document.getElementById('live-progress-label');
+    const liveWorkerBadge = document.getElementById('live-worker-badge');
+    const tabJsonBtn = document.getElementById('tab-json-btn');
+    const tabRawBtn = document.getElementById('tab-raw-btn');
     const statusPill = document.getElementById('run-status-pill');
     const statusText = document.getElementById('run-status-text');
     const istClockEl = document.getElementById('ist-clock');
@@ -753,6 +815,10 @@
     let isRunning = false;
     let envPresets = [];
     let historyList = [];
+
+    dummyMobileEl.addEventListener('change', () => {
+      dummyMobileConfigEl.style.display = dummyMobileEl.checked ? 'block' : 'none';
+    });
 
     function formatIst12Hr(val) {
       if (!val) return '';
@@ -881,13 +947,99 @@
       updateButtons();
     }
 
+    let activeViewMode = 'json';
+    const rollingJsonRecords = [];
+    let terminalLines = [];
+    let rafScheduled = false;
+
+    if (tabJsonBtn && tabRawBtn) {
+      tabJsonBtn.addEventListener('click', () => {
+        activeViewMode = 'json';
+        tabJsonBtn.className = 'btn btn-primary';
+        tabRawBtn.className = 'btn btn-secondary';
+        executionJsonView.style.display = 'block';
+        consoleLogEl.style.display = 'none';
+      });
+
+      tabRawBtn.addEventListener('click', () => {
+        activeViewMode = 'raw';
+        tabRawBtn.className = 'btn btn-primary';
+        tabJsonBtn.className = 'btn btn-secondary';
+        executionJsonView.style.display = 'none';
+        consoleLogEl.style.display = 'block';
+        renderConsoleLogs();
+      });
+    }
+
+    function renderConsoleLogs() {
+      consoleLogEl.textContent = terminalLines.join('\n') + '\n';
+      consoleLogEl.scrollTop = consoleLogEl.scrollHeight;
+    }
+
+    function onExecutionJsonReceived(data) {
+      if (!data) return;
+      if (liveProgressContainer) {
+        liveProgressContainer.style.display = 'block';
+      }
+      if (liveProgressBar) {
+        liveProgressBar.style.width = `${data.percent || 0}%`;
+      }
+      if (liveProgressPercent) {
+        liveProgressPercent.textContent = `${data.percent || 0}%`;
+      }
+      if (liveProgressLabel) {
+        liveProgressLabel.textContent = `Row ${data.rowIndex}: ${data.label} [${data.status}] (${data.progress})`;
+      }
+      if (liveWorkerBadge) {
+        liveWorkerBadge.textContent = `[${data.workerId || 'Worker'}] Row ${data.rowIndex}`;
+      }
+
+      if (data.kpis) {
+        document.getElementById('kpi-total').textContent = String(data.kpis.total || 0);
+        document.getElementById('kpi-success').textContent = String(data.kpis.passed || 0);
+        document.getElementById('kpi-failed').textContent = String(data.kpis.failed || 0);
+        document.getElementById('kpi-skipped').textContent = String(data.kpis.skipped || 0);
+      }
+
+      const displayItem = {
+        row: data.rowIndex,
+        status: data.status,
+        name: data.label,
+        ...(data.erpRecordId ? { erpRecordId: data.erpRecordId } : {}),
+        ...(data.duration !== undefined ? { duration: `${data.duration}s` } : {}),
+        progress: `${data.progress} (${data.percent}%)`,
+        time: data.timestamp || formatIstTimeOnly12Hr(),
+        ...(data.message ? { message: data.message } : {})
+      };
+
+      rollingJsonRecords.unshift(displayItem);
+      if (rollingJsonRecords.length > 30) {
+        rollingJsonRecords.pop();
+      }
+
+      if (executionJsonView) {
+        executionJsonView.textContent = JSON.stringify(rollingJsonRecords, null, 2);
+      }
+    }
+
     function clearExecutionDetails(metaMsg = 'Fresh execution in progress...') {
       document.getElementById('kpi-total').textContent = '0';
       document.getElementById('kpi-success').textContent = '0';
       document.getElementById('kpi-failed').textContent = '0';
       document.getElementById('kpi-skipped').textContent = '0';
       document.getElementById('latest-run-meta').textContent = metaMsg;
-      consoleLogEl.textContent = `[${formatIstTimeOnly12Hr()}] Initializing execution run...\n`;
+      terminalLines = [`[${formatIstTimeOnly12Hr()}] Initializing execution run...`];
+      consoleLogEl.textContent = terminalLines.join('\n') + '\n';
+      rollingJsonRecords.length = 0;
+      if (executionJsonView) {
+        executionJsonView.textContent = JSON.stringify([{ status: 'INITIALIZING', message: 'Waiting for first record...', time: formatIstTimeOnly12Hr() }], null, 2);
+      }
+      if (liveProgressContainer) {
+        liveProgressContainer.style.display = 'block';
+        liveProgressBar.style.width = '0%';
+        liveProgressPercent.textContent = '0%';
+        liveProgressLabel.textContent = 'Initializing execution run...';
+      }
       if (historyRunSelect) {
         historyRunSelect.value = 'latest';
       }
@@ -1155,6 +1307,9 @@
           headless: !headedEl.checked,
           retryFailed: retryEl.checked,
           useAiIntelligence: aiIntelligenceEl.checked,
+          allowDummyMobile: dummyMobileEl.checked,
+          startMobile: dummyMobileEl.checked && startMobileInput.value.trim() ? startMobileInput.value.trim() : undefined,
+          financialYearResponse: fyearResponseInput.value.trim() || undefined,
           limit: limitEl.value ? Number(limitEl.value) : undefined,
           reportOnly
         })
@@ -1179,9 +1334,15 @@
         updateReportKpis(status.latestReport);
       }
 
+      if (status.recentJsonEvents && status.recentJsonEvents.length > 0) {
+        status.recentJsonEvents.forEach(evt => onExecutionJsonReceived(evt));
+      } else if (status.latestExecutionJson) {
+        onExecutionJsonReceived(status.latestExecutionJson);
+      }
+
       if (status.logs && status.logs.length > 0) {
-        consoleLogEl.textContent = status.logs.join('\n') + '\n';
-        consoleLogEl.scrollTop = consoleLogEl.scrollHeight;
+        terminalLines = [...status.logs];
+        renderConsoleLogs();
       }
 
       setRunState(status.running, status.exitCode);
@@ -1192,10 +1353,25 @@
       if (openAiReportBtn) openAiReportBtn.style.display = status.aiHistoryExists ? 'inline-flex' : 'none';
 
       const events = new EventSource('/api/events');
+      events.addEventListener('execution_json', (e) => {
+        try {
+          const payload = JSON.parse(e.data);
+          onExecutionJsonReceived(payload);
+        } catch {}
+      });
       events.addEventListener('log', (e) => {
         const payload = JSON.parse(e.data);
-        consoleLogEl.textContent += payload.line + '\n';
-        consoleLogEl.scrollTop = consoleLogEl.scrollHeight;
+        terminalLines.push(payload.line);
+        if (terminalLines.length > 250) {
+          terminalLines.shift();
+        }
+        if (activeViewMode === 'raw' && !rafScheduled) {
+          rafScheduled = true;
+          requestAnimationFrame(() => {
+            renderConsoleLogs();
+            rafScheduled = false;
+          });
+        }
       });
       events.addEventListener('state', (e) => {
         const payload = JSON.parse(e.data);
@@ -1204,6 +1380,11 @@
       events.addEventListener('done', async (e) => {
         const payload = JSON.parse(e.data);
         setRunState(false, payload.exitCode);
+        if (liveProgressContainer) {
+          liveProgressPercent.textContent = '100%';
+          liveProgressBar.style.width = '100%';
+          liveProgressLabel.textContent = `Execution Finished (Exit ${payload.exitCode ?? 0})`;
+        }
         if (payload.history) {
           populateHistoryDropdown(payload.history);
         }

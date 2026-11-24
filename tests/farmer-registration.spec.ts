@@ -92,8 +92,7 @@ test.describe('Farmer Registration', () => {
     const animalCodes = [
       record.buffaloAccountCode ? `Buffalo: ${record.buffaloAccountCode}` : '',
       record.cowAccountCode ? `Cow: ${record.cowAccountCode}` : '',
-      record.kovaleDudhAccountCode ? `Kovale: ${record.kovaleDudhAccountCode}` : '',
-      record.accountCode ? `Code: ${record.accountCode}` : ''
+      record.kovaleDudhAccountCode ? `Kovale: ${record.kovaleDudhAccountCode}` : ''
     ].filter(Boolean).join(', ');
 
     const testName = `[${index + 1}/${records.length}] Farmer: ${record.nameInEnglish} (${animalCodes || 'Pending Code'})`;

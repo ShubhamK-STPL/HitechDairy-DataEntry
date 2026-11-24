@@ -10,6 +10,7 @@ import { WorkerService, type WorkerRunSummary } from './services/WorkerService';
 import { buildFullSheetReportRecords } from './services/OnboardingReportBuilder';
 import { CustomHistoryReporter, type TestRecordSummary } from './utils/CustomHistoryReporter';
 import { assertExcelFileWritable } from './utils/excelSheetHelper';
+import { DummyMobileAllocator } from './utils/dummyMobileAllocator';
 
 /**
  * Clears any stale session state file and runs the Playwright login setup test
@@ -108,6 +109,18 @@ async function main() {
 
   process.env.USE_AI_INTELLIGENCE = settings.useAiIntelligence ? 'true' : 'false';
 
+  if (settings.allowDummyMobile) {
+    process.env.ALLOW_DUMMY_MOBILE = 'true';
+    await DummyMobileAllocator.resetSequence(settings.startDummyMobile);
+    if (settings.startDummyMobile) {
+      console.log(`📱 [Dummy Mobile] Enabled with custom starting mobile: ${settings.startDummyMobile}`);
+    } else {
+      console.log(`📱 [Dummy Mobile] Enabled with auto pattern: 600{orgId}XXXX (starting from 0001)`);
+    }
+  } else {
+    process.env.ALLOW_DUMMY_MOBILE = 'false';
+  }
+
   console.log('\n============================================================');
   console.log('🚀 HitechDairy Worker Onboarding Controller');
   console.log(`   Module       : ${settings.module}`);
@@ -116,6 +129,7 @@ async function main() {
   console.log(`   Excel Path   : ${settings.excelPath}`);
   console.log(`   AI Intel     : ${settings.useAiIntelligence ? 'ENABLED (Groq LLM)' : 'DISABLED'}`);
   console.log(`   Retry Failed : ${settings.retryFailed}`);
+  console.log(`   Dummy Mobile : ${settings.allowDummyMobile ? (settings.startDummyMobile ? `YES (start: ${settings.startDummyMobile})` : 'YES (600{orgId}0001)') : 'NO (from Excel)'}`);
   if (settings.limit) console.log(`   Batch Limit  : ${settings.limit}`);
   console.log('============================================================\n');
 

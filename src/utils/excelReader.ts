@@ -82,15 +82,31 @@ function normalizeSupplierRow(row: Record<string, any>, index: number): Supplier
   const cleanMobile = rawMobile.replace(/\D/g, '').slice(-10);
   const resolvedName = supplierName || regionalName;
   const addressVal = getField(['Address', 'addressDetails', 'Street Address']);
-  const rawBankVal = getField(['Select Bank', 'Bank', 'Bank Name', 'bankId']);
-  const hasBank = Boolean(rawBankVal && rawBankVal.trim());
-  const accNoVal = hasBank ? getField(['Account Number', 'accountNo', 'Acc No']).replace(/[^a-zA-Z0-9]/g, '') : '';
+  const rawBankVal = getField(['Select Bank', 'Bank', 'Bank Name', 'bankId']).trim();
+  const rawAccHolderVal = getField(['Account Holder Name', 'accountHolderName', 'Holder Name']).trim();
+  const rawAccTypeVal = getField(['Account Type', 'bankAccType', 'Acc Type']).trim();
+  const rawAccNoVal = getField(['Account Number', 'accountNo', 'Acc No']).replace(/[^a-zA-Z0-9]/g, '').trim();
+  const rawIfscVal = getField(['IFSC Code', 'ifscCode', 'IFSC']).toUpperCase().trim();
+  const rawBranchVal = getField(['Branch Name', 'branchName', 'Branch']).trim();
+
+  // All 6 bank fields must be non-empty to add bank details
+  const hasCompleteBank = Boolean(
+    rawBankVal &&
+    rawAccHolderVal &&
+    rawAccTypeVal &&
+    rawAccNoVal &&
+    rawIfscVal &&
+    rawBranchVal
+  );
+
+  const bankNameVal = hasCompleteBank ? rawBankVal : '';
+  const accHolderVal = hasCompleteBank ? rawAccHolderVal : '';
+  const accTypeVal = hasCompleteBank ? (rawAccTypeVal as any) : '';
+  const accNoVal = hasCompleteBank ? rawAccNoVal : '';
+  const ifscVal = hasCompleteBank ? rawIfscVal : '';
+  const branchVal = hasCompleteBank ? rawBranchVal : '';
   const aadharVal = getField(['Aadhar Number', 'Aadhar', 'aadharNo', 'Adhar', 'UID']).replace(/\D/g, '').slice(0, 12);
-  const accTypeVal = hasBank ? (getField(['Account Type', 'bankAccType', 'Acc Type']) as any) : '';
-  const accHolderVal = hasBank ? getField(['Account Holder Name', 'accountHolderName', 'Holder Name']) : '';
-  const ifscVal = hasBank ? getField(['IFSC Code', 'ifscCode', 'IFSC']).toUpperCase() : '';
-  const branchVal = hasBank ? getField(['Branch Name', 'branchName', 'Branch']) : '';
-  const passbookChequeVal = hasBank ? getField(['Passbook-Cheque', 'Passbook', 'Cheque', 'passbookChequeFile']) : '';
+  const passbookChequeVal = hasCompleteBank ? getField(['Passbook-Cheque', 'Passbook', 'Cheque', 'passbookChequeFile']) : '';
 
   return {
     // 1. Basic Details
@@ -114,8 +130,8 @@ function normalizeSupplierRow(row: Record<string, any>, index: number): Supplier
     addressDetails: addressVal,
     address: addressVal,
 
-    // 3. Bank Details (skip all following fields if Select Bank is empty)
-    bankName: hasBank ? rawBankVal.trim() : '',
+    // 3. Bank Details (all-or-nothing: if any of the 6 bank fields is empty, skip bank)
+    bankName: bankNameVal,
     accountHolderName: accHolderVal,
     bankAccType: accTypeVal,
     accountType: accTypeVal,

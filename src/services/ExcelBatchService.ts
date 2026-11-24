@@ -35,7 +35,7 @@ export interface RowTelemetryUpdate {
 }
 
 const TELEMETRY_COLUMNS = [
-  'Status',
+  'Run_Status',
   'WorkerId',
   'ErpRecordId',
   'ErrorMessage',
@@ -45,7 +45,7 @@ const TELEMETRY_COLUMNS = [
 type TelemetryColumnName = typeof TELEMETRY_COLUMNS[number];
 
 const HEADER_DETECT_HINTS = [
-  'Status',
+  'Run_Status',
   'Select Unit Name',
   'Name In English',
   'Contact Number',
@@ -130,8 +130,9 @@ export class ExcelBatchService {
       }
 
       const rawStatus = (record.status || '').trim().toUpperCase();
+      // Record is pending execution if Run_Status is blank or PENDING
       const isPending = rawStatus === '' || rawStatus === 'PENDING';
-      const isRetryableFail = retryFailed && rawStatus === 'FAILED';
+      const isRetryableFail = retryFailed && (rawStatus === 'FAILED' || rawStatus === 'REVIEW_REQUIRED');
 
       if (!isPending && !isRetryableFail) {
         skippedAlreadyProcessed++;
@@ -182,7 +183,7 @@ export class ExcelBatchService {
         sheet['!ref'] = xlsx.utils.encode_range(range);
       }
 
-      this.setCell(sheet, update.rowIndex, 'Status', update.status);
+      this.setCell(sheet, update.rowIndex, 'Run_Status', update.status);
       if (update.workerId !== undefined) {
         this.setCell(sheet, update.rowIndex, 'WorkerId', update.workerId);
       }
@@ -196,8 +197,10 @@ export class ExcelBatchService {
 
       if (update.status !== 'IN_PROGRESS') {
         this.dirtyCount++;
-        if (this.dirtyCount >= this.flushInterval) {
-          this.writeWorkbookWithRetry();
+        // "Release Excel" during runtime: write to disk only if an explicit interval > 0 was requested,
+        // otherwise buffer in memory and flush to .xlsx in a single clean write at the end.
+        if (this.flushInterval > 0 && Number.isFinite(this.flushInterval) && this.dirtyCount >= this.flushInterval) {
+          await this.writeWorkbookWithRetry();
           this.dirtyCount = 0;
         }
       }
@@ -212,7 +215,7 @@ export class ExcelBatchService {
   async flush(): Promise<void> {
     this.writeLock = this.writeLock.then(async () => {
       if (this.workbook && this.dirtyCount > 0) {
-        this.writeWorkbookWithRetry();
+        await this.writeWorkbookWithRetry();
         this.dirtyCount = 0;
       }
     });
@@ -260,16 +263,17 @@ export class ExcelBatchService {
     sheet[xlsx.utils.encode_cell({ r: rowIndex, c: colIdx })] = { t: 's', v: value };
   }
 
-  private writeWorkbookWithRetry(): void {
-    const maxRetries = 5;
+  private async writeWorkbookWithRetry(): Promise<void> {
+    const maxRetries = 10;
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         xlsx.writeFile(this.workbook, this.filePath);
+        console.log(`💾 [Excel Released Sync] Flushed final telemetry updates to ${path.basename(this.filePath)}`);
         return;
       } catch (err: any) {
         if ((err.code === 'EBUSY' || err.code === 'EPERM') && attempt < maxRetries) {
-          const end = Date.now() + attempt * 400;
-          while (Date.now() < end) {}
+          console.warn(`⏳ [Excel Locked] File is busy or open in another application. Retrying write (${attempt}/${maxRetries})...`);
+          await new Promise(resolve => setTimeout(resolve, attempt * 500));
         } else {
           console.error(
             `[ExcelBatchService] Failed to write Excel (${err.message}). Results remain safely in ${this.recoveryLogPath}`

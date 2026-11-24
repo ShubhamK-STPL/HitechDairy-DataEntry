@@ -9,6 +9,8 @@ interface RunPayload {
   parallel?: boolean;
   retryFailed?: boolean;
   useAiIntelligence?: boolean;
+  allowDummyMobile?: boolean;
+  startMobile?: string;
   limit?: number;
 }
 
@@ -133,6 +135,8 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
           workers: String(workers),
           parallel: String(parallel),
           retry_failed: String(retryFailed),
+          allow_dummy_mobile: String(Boolean(body.allowDummyMobile)),
+          start_dummy_mobile: body.allowDummyMobile && body.startMobile ? String(body.startMobile).trim() : '',
           limit: String(limit),
           excel_file_path: excelFilePath,
           run_id: runId

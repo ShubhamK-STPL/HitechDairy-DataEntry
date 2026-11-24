@@ -119,14 +119,29 @@ function normalizeCustomerRow(row: Record<string, any>, _index: number): Custome
   // Address
   const address = getField(['Address', 'addressDetails', 'Street Address']);
 
-  // Bank
-  const rawBank = getField(['Select Bank', 'Bank', 'Bank Name', 'bankId']);
-  const hasBank = Boolean(rawBank && rawBank.trim());
-  const accNo = hasBank ? getField(['Account Number', 'accountNo', 'Acc No']).replace(/[^a-zA-Z0-9]/g, '') : '';
-  const accType = hasBank ? (getField(['Account Type', 'bankAccType', 'Acc Type']) as any) : '';
-  const accHolder = hasBank ? getField(['Account Holder Name', 'accountHolderName', 'Holder Name']) : '';
-  const ifsc = hasBank ? getField(['IFSC Code', 'ifscCode', 'IFSC']).toUpperCase() : '';
-  const branch = hasBank ? getField(['Branch Name', 'branchName', 'Branch']) : '';
+  // Bank (all-or-nothing: if ANY of the 6 bank fields is missing, skip entire bank section)
+  const rawBank = getField(['Select Bank', 'Bank', 'Bank Name', 'bankId']).trim();
+  const rawAccHolder = getField(['Account Holder Name', 'accountHolderName', 'Holder Name']).trim();
+  const rawAccType = getField(['Account Type', 'bankAccType', 'Acc Type']).trim();
+  const rawAccNo = getField(['Account Number', 'accountNo', 'Acc No']).replace(/[^a-zA-Z0-9]/g, '').trim();
+  const rawIfsc = getField(['IFSC Code', 'ifscCode', 'IFSC']).toUpperCase().trim();
+  const rawBranch = getField(['Branch Name', 'branchName', 'Branch']).trim();
+
+  const hasCompleteBank = Boolean(
+    rawBank &&
+    rawAccHolder &&
+    rawAccType &&
+    rawAccNo &&
+    rawIfsc &&
+    rawBranch
+  );
+
+  const bankName = hasCompleteBank ? rawBank : '';
+  const accHolder = hasCompleteBank ? rawAccHolder : '';
+  const accType = hasCompleteBank ? (rawAccType as any) : '';
+  const accNo = hasCompleteBank ? rawAccNo : '';
+  const ifsc = hasCompleteBank ? rawIfsc : '';
+  const branch = hasCompleteBank ? rawBranch : '';
 
   // Additional
   const aadhar = getField(['Aadhar Number', 'Aadhar', 'aadharNo', 'Adhar', 'UID']).replace(/\D/g, '').slice(0, 12);
@@ -157,8 +172,8 @@ function normalizeCustomerRow(row: Record<string, any>, _index: number): Custome
     address,
     addressDetails: address,
 
-    // 3. Bank Details (skip all following fields if Select Bank is empty)
-    bankName: hasBank ? rawBank.trim() : '',
+    // 3. Bank Details (all-or-nothing: if any of the 6 bank fields is empty, skip bank)
+    bankName,
     accountHolderName: accHolder,
     accountType: accType,
     bankAccType: accType,

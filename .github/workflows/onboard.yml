@@ -60,6 +60,18 @@ on:
         options:
           - 'true'
           - 'false'
+      allow_dummy_mobile:
+        description: 'Allow dummy mobile numbers (600{orgId}XXXX)'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+      start_dummy_mobile:
+        description: 'Optional custom starting dummy mobile (10 digits)'
+        required: false
+        default: ''
       limit:
         description: 'Batch limit (0 for all records)'
         required: false
@@ -134,6 +146,14 @@ jobs:
             ARGS="$ARGS --use-ai"
           else
             ARGS="$ARGS --no-ai"
+          fi
+
+          if [ "${{ github.event.inputs.allow_dummy_mobile }}" = "true" ]; then
+            ARGS="$ARGS --dummy-mobile"
+            START_MOB="${{ github.event.inputs.start_dummy_mobile }}"
+            if [ -n "$START_MOB" ]; then
+              ARGS="$ARGS --start-mobile=$START_MOB"
+            fi
           fi
 
           LIMIT="${{ github.event.inputs.limit }}"

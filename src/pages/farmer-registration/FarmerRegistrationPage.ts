@@ -5,6 +5,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { GroqIntelligenceService } from '../../services/groqIntelligenceService';
 import { ENV } from '../../config/envConfig';
+import { DummyMobileAllocator } from '../../utils/dummyMobileAllocator';
 
 export class FarmerRegistrationPage extends BasePage {
   // 1. Basic Details Locators
@@ -124,7 +125,7 @@ export class FarmerRegistrationPage extends BasePage {
   }
 
   /**
-   * Selects an option from an Angular Material mat-select dropdown
+   * Selects an option from an Angular Material mat-select dropdown with robust pointer interception handling
    */
   async selectMatOption(selectLocator: Locator, optionText?: string | null, timeoutMs = 10000): Promise<this> {
     if (!optionText) return this;
@@ -140,22 +141,65 @@ export class FarmerRegistrationPage extends BasePage {
     }
 
     await selectLocator.scrollIntoViewIfNeeded();
-    await this.eleUtil.click(selectLocator);
 
-    const overlay = this.page.locator('.cdk-overlay-container, mat-select-panel');
-    await overlay.locator('mat-option').first().waitFor({ state: 'visible', timeout: timeoutMs }).catch(() => {});
+    // RCA Fix: Angular Material MDC notched outline or mat-label often overlays the mat-select element
+    // Attempt 1: Regular click
+    // Attempt 2: Force click on selectLocator
+    // Attempt 3: Click parent mat-form-field container
+    // Attempt 4: Focus and trigger with Space key
+    try {
+      await selectLocator.click({ timeout: 2500 });
+    } catch {
+      try {
+        await selectLocator.click({ force: true, timeout: 2500 });
+      } catch {
+        const formField = selectLocator.locator('xpath=ancestor::mat-form-field').first();
+        if (await formField.isVisible().catch(() => false)) {
+          await formField.click({ force: true, timeout: 2500 }).catch(() => {});
+        } else {
+          await selectLocator.focus().catch(() => {});
+          await this.page.keyboard.press('Space').catch(() => {});
+        }
+      }
+    }
+
+    const overlay = this.page.locator('.cdk-overlay-container, mat-select-panel, .mat-mdc-select-panel');
+    await overlay.locator('mat-option, [role="option"]').first().waitFor({ state: 'visible', timeout: timeoutMs }).catch(() => {});
+
+    // If dropdown contains a search box (e.g. Bank or large list), type into it to avoid picking wrong items
+    const searchInput = overlay.locator("xpath=.//input[@type='text' and (contains(@placeholder,'Search') or contains(@aria-label,'Search'))]").first();
+    if (await searchInput.isVisible({ timeout: 1000 }).catch(() => false)) {
+      await searchInput.fill('');
+      await searchInput.pressSequentially(cleanOption, { delay: 10 });
+      await this.waitForStep(200);
+    }
 
     const escaped = this.escapeRegExp(cleanOption);
-    const option = overlay.locator('mat-option, [role="option"]').filter({
+    // Prioritize exact full match first
+    let option = overlay.locator('mat-option, [role="option"]').filter({
       hasText: new RegExp(`^\\s*${escaped}\\s*$`, 'i')
-    }).or(
-      overlay.locator('mat-option, [role="option"]').filter({
-        hasText: new RegExp(escaped, 'i')
-      })
-    ).first();
+    }).first();
+
+    // If exact match not found (e.g. Route "Gardi (1000)" vs "Gardi"), match boundary before loose substring
+    if ((await option.count()) === 0) {
+      const boundaryMatches = overlay.locator('mat-option, [role="option"]').filter({
+        hasText: new RegExp(`(^|\\s|\\()${escaped}(\\)|\\s|$)`, 'i')
+      });
+      if ((await boundaryMatches.count()) > 0) {
+        option = boundaryMatches.first();
+      } else {
+        option = overlay.locator('mat-option, [role="option"]').filter({
+          hasText: new RegExp(escaped, 'i')
+        }).first();
+      }
+    }
 
     await option.waitFor({ state: 'visible', timeout: timeoutMs });
-    await this.eleUtil.click(option);
+    try {
+      await option.click({ timeout: 3000 });
+    } catch {
+      await option.click({ force: true, timeout: 3000 });
+    }
     await this.waitForStep(300);
     return this;
   }
@@ -222,7 +266,7 @@ export class FarmerRegistrationPage extends BasePage {
   /**
    * Configures Milk Type Account Code row (checks animal checkbox and sets account code if provided)
    */
-  async setMilkTypeAccountCode(rowLocator: Locator, accountCode?: string | null): Promise<void> {
+  async setMilkTypeAccountCode(rowLocator: Locator, accountCode?: string | null, animalLabel: string = 'Milk Type Account Code'): Promise<void> {
     const isRowVisible = await this.eleUtil.isVisible(rowLocator, 2000);
     if (!isRowVisible) return;
 
@@ -245,7 +289,7 @@ export class FarmerRegistrationPage extends BasePage {
 
       // 2. Fill account code once input is enabled
       await input.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-      await this.eleUtil.fill(input, cleanCode);
+      await this.eleUtil.fill(input, cleanCode, undefined, animalLabel);
       await this.waitForStep(200);
     } else {
       // If code is not provided in Excel, uncheck if checked
@@ -298,13 +342,13 @@ export class FarmerRegistrationPage extends BasePage {
 
     // Name In English *
     if (farmer.nameInEnglish) {
-      await this.eleUtil.fill(this.nameInEnglishInput, farmer.nameInEnglish);
+      await this.eleUtil.fill(this.nameInEnglishInput, farmer.nameInEnglish, undefined, 'Name in English');
     }
 
     // Name In Regional Language *
     const regionalName = farmer.nameInRegional || farmer.nameInEnglish;
     if (regionalName) {
-      await this.eleUtil.fill(this.nameInRegionalInput, regionalName);
+      await this.eleUtil.fill(this.nameInRegionalInput, regionalName, undefined, 'Name in Regional Language');
     }
 
     // Select Category [Company, Individual] * (default: Individual)
@@ -312,14 +356,27 @@ export class FarmerRegistrationPage extends BasePage {
     await this.selectRadio(this.categoryRadioGroup, category);
 
     // Contact Number *
-    if (farmer.contactNumber) {
-      const cleanPhone = farmer.contactNumber.replace(/\D/g, '').slice(-10);
-      await this.eleUtil.fill(this.contactNumberInput, cleanPhone);
+    let contact = farmer.contactNumber;
+    if (process.env.ALLOW_DUMMY_MOBILE === 'true') {
+      const isBlank = !contact || !/^[6-9]\d{9}$/.test(contact);
+      const isDuplicate = contact ? DummyMobileAllocator.isDuplicateMobile(contact) : false;
+
+      if (isBlank || isDuplicate) {
+        contact = DummyMobileAllocator.claimNextMobile();
+        console.log(`📱 [Dummy Mobile] Allocated dummy mobile ${contact} (Reason: ${isBlank ? 'Blank/Invalid in Excel' : 'Duplicate of earlier record in batch'})`);
+      } else {
+        DummyMobileAllocator.trackMobile(contact);
+        console.log(`📱 [Real Mobile] Preserving unique Excel mobile: ${contact}`);
+      }
+    }
+    if (contact) {
+      const cleanPhone = contact.replace(/\D/g, '').slice(-10);
+      await this.eleUtil.fill(this.contactNumberInput, cleanPhone, undefined, 'Contact Number');
     }
 
     // Email ID (optional)
     if (farmer.emailId && (await this.eleUtil.isVisible(this.emailIdInput, 1000))) {
-      await this.eleUtil.fill(this.emailIdInput, farmer.emailId.trim());
+      await this.eleUtil.fill(this.emailIdInput, farmer.emailId.trim(), undefined, 'Email ID');
     }
 
     // Gender [Male, Female, Other] (optional, default Male)
@@ -339,23 +396,50 @@ export class FarmerRegistrationPage extends BasePage {
     // 2. ADDRESS DETAILS (optional fill only if excel has value)
     // ---------------------------------------------------------
     if (farmer.state) {
-      await this.selectMatOption(this.stateSelect, farmer.state);
-      await this.page.waitForTimeout(500);
+      const currentState = (await this.stateSelect.textContent().catch(() => ''))?.trim() || '';
+      if (!currentState.toLowerCase().includes(farmer.state.trim().toLowerCase())) {
+        const respPromise = this.page.waitForResponse(
+          res => res.url().toLowerCase().includes('district') && res.status() === 200,
+          { timeout: 4000 }
+        ).catch(() => null);
+        await this.selectMatOption(this.stateSelect, farmer.state);
+        await respPromise;
+        await this.waitForSpinnerToHide(2000);
+      }
     }
     if (farmer.district) {
-      await this.selectMatOption(this.districtSelect, farmer.district);
-      await this.page.waitForTimeout(500);
+      const currentDistrict = (await this.districtSelect.textContent().catch(() => ''))?.trim() || '';
+      if (!currentDistrict.toLowerCase().includes(farmer.district.trim().toLowerCase())) {
+        const respPromise = this.page.waitForResponse(
+          res => (res.url().toLowerCase().includes('taluka') || res.url().toLowerCase().includes('subdistrict')) && res.status() === 200,
+          { timeout: 4000 }
+        ).catch(() => null);
+        await this.selectMatOption(this.districtSelect, farmer.district);
+        await respPromise;
+        await this.waitForSpinnerToHide(2000);
+      }
     }
     if (farmer.taluka) {
-      await this.selectMatOption(this.talukaSelect, farmer.taluka);
-      await this.page.waitForTimeout(500);
+      const currentTaluka = (await this.talukaSelect.textContent().catch(() => ''))?.trim() || '';
+      if (!currentTaluka.toLowerCase().includes(farmer.taluka.trim().toLowerCase())) {
+        const respPromise = this.page.waitForResponse(
+          res => (res.url().toLowerCase().includes('village') || res.url().toLowerCase().includes('town')) && res.status() === 200,
+          { timeout: 4000 }
+        ).catch(() => null);
+        await this.selectMatOption(this.talukaSelect, farmer.taluka);
+        await respPromise;
+        await this.waitForSpinnerToHide(2000);
+      }
     }
     if (farmer.townVillage) {
-      await this.selectMatOption(this.townSelect, farmer.townVillage);
-      await this.page.waitForTimeout(400);
+      const currentTown = (await this.townSelect.textContent().catch(() => ''))?.trim() || '';
+      if (!currentTown.toLowerCase().includes(farmer.townVillage.trim().toLowerCase())) {
+        await this.selectMatOption(this.townSelect, farmer.townVillage);
+        await this.waitForSpinnerToHide(1500);
+      }
     }
     if (farmer.address && (await this.eleUtil.isVisible(this.addressTextarea, 1000))) {
-      await this.eleUtil.fill(this.addressTextarea, farmer.address.trim());
+      await this.eleUtil.fill(this.addressTextarea, farmer.address.trim(), undefined, 'Address');
     }
 
     // ---------------------------------------------------------
@@ -375,37 +459,44 @@ export class FarmerRegistrationPage extends BasePage {
 
     // NDDB Farmer Id
     if (farmer.nddbFarmerId && (await this.eleUtil.isVisible(this.nddbFarmerIdInput, 1000))) {
-      await this.eleUtil.fill(this.nddbFarmerIdInput, farmer.nddbFarmerId.trim());
+      await this.eleUtil.fill(this.nddbFarmerIdInput, farmer.nddbFarmerId.trim(), undefined, 'NDDB Farmer ID');
     }
 
     // Agri Stack Id
     if (farmer.agriStackId && (await this.eleUtil.isVisible(this.agriStackIdInput, 1000))) {
-      await this.eleUtil.fill(this.agriStackIdInput, farmer.agriStackId.trim());
+      await this.eleUtil.fill(this.agriStackIdInput, farmer.agriStackId.trim(), undefined, 'Agri Stack ID');
     }
 
     // Milk Type Account Code (fill if has value)
-    const buffaloCode = farmer.buffaloAccountCode || farmer.accountCode || '';
-    const cowCode = farmer.cowAccountCode || farmer.accountCode || '';
+    const buffaloCode = farmer.buffaloAccountCode || '';
+    const cowCode = farmer.cowAccountCode || '';
     const kovaleCode = farmer.kovaleDudhAccountCode || '';
 
-    // If generic accountCode was supplied without specific buffalo/cow codes, apply to both
-    await this.setMilkTypeAccountCode(this.buffaloRow, buffaloCode);
-    await this.setMilkTypeAccountCode(this.cowRow, cowCode);
+    await this.setMilkTypeAccountCode(this.buffaloRow, buffaloCode, 'Buffalo code');
+    await this.setMilkTypeAccountCode(this.cowRow, cowCode, 'Cow code');
     if (kovaleCode) {
-      await this.setMilkTypeAccountCode(this.kovaleRow, kovaleCode);
+      await this.setMilkTypeAccountCode(this.kovaleRow, kovaleCode, 'Kovale Dudh code');
     }
 
     // ---------------------------------------------------------
-    // 4. BANK DETAILS (skip all fields if Select Bank is empty)
+    // 4. BANK DETAILS (only proceed if ALL 6 bank details are available)
     // ---------------------------------------------------------
-    const hasBank = Boolean(farmer.bankName && farmer.bankName.trim());
-    if (hasBank && (await this.eleUtil.isVisible(this.bankSelect, 1500))) {
+    const hasCompleteBankDetails = Boolean(
+      farmer.bankName?.trim() &&
+      farmer.accountHolderName?.trim() &&
+      farmer.accountType?.trim() &&
+      farmer.accountNumber?.trim() &&
+      farmer.ifscCode?.trim() &&
+      farmer.branchName?.trim()
+    );
+
+    if (hasCompleteBankDetails && (await this.eleUtil.isVisible(this.bankSelect, 1500))) {
       await this.selectMatOption(this.bankSelect, farmer.bankName!.trim());
       await this.waitForStep(400);
 
       // Account Holder Name (enabled after bank selection)
       if (farmer.accountHolderName && (await this.eleUtil.isVisible(this.accountHolderNameInput, 1500))) {
-        await this.eleUtil.fill(this.accountHolderNameInput, farmer.accountHolderName.trim());
+        await this.eleUtil.fill(this.accountHolderNameInput, farmer.accountHolderName.trim(), undefined, 'Account Holder Name');
       }
 
       // Account Type (Savings / Current)
@@ -415,32 +506,31 @@ export class FarmerRegistrationPage extends BasePage {
 
       // Account Number
       if (farmer.accountNumber && (await this.eleUtil.isVisible(this.accountNoInput, 1500))) {
-        await this.eleUtil.fill(this.accountNoInput, farmer.accountNumber.trim());
+        await this.eleUtil.fill(this.accountNoInput, farmer.accountNumber.trim(), undefined, 'Account Number');
       }
 
       // IFSC Code
       if (farmer.ifscCode && (await this.eleUtil.isVisible(this.ifscCodeInput, 1500))) {
-        await this.eleUtil.fill(this.ifscCodeInput, farmer.ifscCode.trim().toUpperCase());
+        await this.eleUtil.fill(this.ifscCodeInput, farmer.ifscCode.trim().toUpperCase(), undefined, 'IFSC Code');
       }
 
       // Branch Name
       if (farmer.branchName && (await this.eleUtil.isVisible(this.branchNameInput, 1500))) {
-        await this.eleUtil.fill(this.branchNameInput, farmer.branchName.trim());
+        await this.eleUtil.fill(this.branchNameInput, farmer.branchName.trim(), undefined, 'Branch Name');
       }
     } else {
-      console.log('ℹ️ Select Bank is empty. Skipping Account Holder Name, Account Type, Account Number, IFSC Code, and Branch Name.');
+      console.log('ℹ️ Incomplete bank details (one or more of Bank, Holder, Type, AccNo, IFSC, Branch missing). Skipping bank section entirely.');
     }
 
     // ---------------------------------------------------------
-    // 5. ADDITIONAL DETAILS (optional fill only if excel has value)
+    // 5. ADDITIONAL DETAILS (Strict validation: invalid PAN or Aadhar left blank)
     // ---------------------------------------------------------
-    if (farmer.panNo && (await this.eleUtil.isVisible(this.panNoInput, 1500))) {
-      await this.eleUtil.fill(this.panNoInput, farmer.panNo.trim().toUpperCase());
+    if (farmer.panNo && /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(farmer.panNo.trim().toUpperCase()) && (await this.eleUtil.isVisible(this.panNoInput, 1500))) {
+      await this.eleUtil.fill(this.panNoInput, farmer.panNo.trim().toUpperCase(), undefined, 'PAN No');
     }
 
-    if (farmer.aadharNumber && (await this.eleUtil.isVisible(this.aadharNoInput, 1500))) {
-      const cleanAadhar = farmer.aadharNumber.replace(/\D/g, '').slice(-12);
-      await this.eleUtil.fill(this.aadharNoInput, cleanAadhar);
+    if (farmer.aadharNumber && /^\d{12}$/.test(farmer.aadharNumber.trim()) && (await this.eleUtil.isVisible(this.aadharNoInput, 1500))) {
+      await this.eleUtil.fill(this.aadharNoInput, farmer.aadharNumber.trim(), undefined, 'Aadhar Number');
     }
   }
 
@@ -505,17 +595,18 @@ export class FarmerRegistrationPage extends BasePage {
       const success = (isExplicitSuccess && !hasErrorKeywords && !isDuplicate) ||
                       (Boolean(response && [200, 201].includes(response.status())) && !isDuplicate && !hasErrorKeywords);
 
-      // Screenshot capture
+      // Screenshot capture (only on failure to eliminate disk I/O lag on successful records)
       let screenshotPath: string | undefined;
       let aiAnalysis: string | undefined;
-      try {
-        const screenshotsDir = path.resolve(process.cwd(), 'test-results', 'submissions');
-        fs.mkdirSync(screenshotsDir, { recursive: true });
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const prefix = success ? 'success' : 'failure';
-        screenshotPath = path.join(screenshotsDir, `farmer_${prefix}_${timestamp}.png`);
-        await this.page.screenshot({ path: screenshotPath, fullPage: true });
-      } catch {}
+      if (!success) {
+        try {
+          const screenshotsDir = path.resolve(process.cwd(), 'test-results', 'submissions');
+          fs.mkdirSync(screenshotsDir, { recursive: true });
+          const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+          screenshotPath = path.join(screenshotsDir, `farmer_failure_${timestamp}.png`);
+          await this.page.screenshot({ path: screenshotPath, fullPage: true });
+        } catch {}
+      }
 
       // AI Analysis on failure
       if (!success && GroqIntelligenceService.isConfigured()) {
@@ -548,9 +639,13 @@ Analyze why this farmer submission failed and provide a 1-sentence solution.`;
   }
 
   /**
-   * Verifies farmer creation via the ERP farmer listing or confirmed server ID.
+   * Verifies farmer creation via confirmed server ID or ERP farmer listing.
    */
   async verifyFarmer(contactOrName: string): Promise<{ found: boolean; id: string }> {
+    // If backend server already confirmed creation with ERP ID, skip navigating to the table!
+    if (this.lastSavedRecordId) {
+      return { found: true, id: this.lastSavedRecordId };
+    }
     return await this.verifyRecordInListing(contactOrName, ENV.FARMER_LIST_URL, this.lastSavedRecordId);
   }
 }

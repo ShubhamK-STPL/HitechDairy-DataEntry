@@ -171,6 +171,21 @@ export class WorkerService {
           workerId: worker.id
         });
 
+        this.emitExecutionJson({
+          workerId: worker.id,
+          rowIndex: rowIndex + 1,
+          label,
+          status: 'IN_PROGRESS',
+          progress: `${i + 1} / ${records.length}`,
+          percent: Number(((i + 1) / records.length * 100).toFixed(1)),
+          kpis: {
+            total: records.length,
+            passed: summary.succeeded,
+            failed: summary.failed,
+            skipped: summary.skippedDuplicates
+          }
+        });
+
         let recordHandled = false;
         let lastScreenshotPath: string | undefined;
         let lastErrorMessage = '';
@@ -219,6 +234,18 @@ export class WorkerService {
               });
               logs.push(`Verified in ERP on retry pre-check! ID: ${finalId || 'OK'}`);
               console.log(`[${worker.id}] ✅ SUCCESS on retry pre-check Row ${rowIndex + 1} (${label})${finalId ? ` [ID: ${finalId}]` : ''}`);
+              this.emitExecutionJson({
+                workerId: worker.id,
+                rowIndex: rowIndex + 1,
+                label,
+                status: 'SUCCESS',
+                erpRecordId: finalId || undefined,
+                duration: Number(((Date.now() - rowStart) / 1000).toFixed(2)),
+                message: 'Verified in ERP on retry pre-check',
+                progress: `${i + 1} / ${records.length}`,
+                percent: Number(((i + 1) / records.length * 100).toFixed(1)),
+                kpis: { total: records.length, passed: summary.succeeded, failed: summary.failed, skipped: summary.skippedDuplicates }
+              });
               summary.testRecords.push({
                 id: `${adapter.moduleName}-row-${rowIndex + 1}`,
                 title: `[${worker.id}] Row ${rowIndex + 1}: ${label}`,
@@ -259,6 +286,18 @@ export class WorkerService {
                 errorMessage: saveResult.message
               });
               console.warn(`[${worker.id}] ⚠️ SKIPPED_DUPLICATE Row ${rowIndex + 1} (${label}): ${saveResult.message}`);
+              this.emitExecutionJson({
+                workerId: worker.id,
+                rowIndex: rowIndex + 1,
+                label,
+                status: 'SKIPPED_DUPLICATE',
+                erpRecordId: existing.id || saveResult.erpRecordId || undefined,
+                duration: Number(((Date.now() - rowStart) / 1000).toFixed(2)),
+                message: saveResult.message,
+                progress: `${i + 1} / ${records.length}`,
+                percent: Number(((i + 1) / records.length * 100).toFixed(1)),
+                kpis: { total: records.length, passed: summary.succeeded, failed: summary.failed, skipped: summary.skippedDuplicates }
+              });
               summary.testRecords.push({
                 id: `${adapter.moduleName}-row-${rowIndex + 1}`,
                 title: `[${worker.id}] Row ${rowIndex + 1}: ${label}`,
@@ -301,6 +340,18 @@ export class WorkerService {
             });
             logs.push(`Verified ID: ${finalId || 'OK'}`);
             console.log(`[${worker.id}] ✅ SUCCESS${isRetry ? ' ON RETRY' : ''} Row ${rowIndex + 1} (${label})${finalId ? ` [ID: ${finalId}]` : ''}`);
+            this.emitExecutionJson({
+              workerId: worker.id,
+              rowIndex: rowIndex + 1,
+              label,
+              status: 'SUCCESS',
+              erpRecordId: finalId || undefined,
+              duration: Number(((Date.now() - rowStart) / 1000).toFixed(2)),
+              message: saveResult.message,
+              progress: `${i + 1} / ${records.length}`,
+              percent: Number(((i + 1) / records.length * 100).toFixed(1)),
+              kpis: { total: records.length, passed: summary.succeeded, failed: summary.failed, skipped: summary.skippedDuplicates }
+            });
             summary.testRecords.push({
               id: `${adapter.moduleName}-row-${rowIndex + 1}`,
               title: `[${worker.id}] Row ${rowIndex + 1}: ${label}`,
@@ -336,6 +387,18 @@ export class WorkerService {
                 });
                 logs.push(`Verified after timeout! ID: ${finalId || 'OK'}`);
                 console.log(`[${worker.id}] ✅ VERIFIED AFTER TIMEOUT Row ${rowIndex + 1} (${label}) [ID: ${finalId}]`);
+                this.emitExecutionJson({
+                  workerId: worker.id,
+                  rowIndex: rowIndex + 1,
+                  label,
+                  status: 'SUCCESS',
+                  erpRecordId: finalId || undefined,
+                  duration: Number(((Date.now() - rowStart) / 1000).toFixed(2)),
+                  message: 'Verified after timeout',
+                  progress: `${i + 1} / ${records.length}`,
+                  percent: Number(((i + 1) / records.length * 100).toFixed(1)),
+                  kpis: { total: records.length, passed: summary.succeeded, failed: summary.failed, skipped: summary.skippedDuplicates }
+                });
                 summary.testRecords.push({
                   id: `${adapter.moduleName}-row-${rowIndex + 1}`,
                   title: `[${worker.id}] Row ${rowIndex + 1}: ${label}`,
@@ -378,6 +441,17 @@ export class WorkerService {
           });
           logs.push(`${finalStatus}: ${lastErrorMessage}`);
           console.error(`[${worker.id}] ❌ ${finalStatus} Row ${rowIndex + 1} (${label}) after retry: ${lastErrorMessage}`);
+          this.emitExecutionJson({
+            workerId: worker.id,
+            rowIndex: rowIndex + 1,
+            label,
+            status: finalStatus,
+            duration: Number(((Date.now() - rowStart) / 1000).toFixed(2)),
+            message: lastErrorMessage,
+            progress: `${i + 1} / ${records.length}`,
+            percent: Number(((i + 1) / records.length * 100).toFixed(1)),
+            kpis: { total: records.length, passed: summary.succeeded, failed: summary.failed, skipped: summary.skippedDuplicates }
+          });
           summary.testRecords.push({
             id: `${adapter.moduleName}-row-${rowIndex + 1}`,
             title: `[${worker.id}] Row ${rowIndex + 1}: ${label}`,
@@ -405,5 +479,25 @@ export class WorkerService {
     }
 
     return summary;
+  }
+
+  private emitExecutionJson(data: {
+    workerId: string;
+    rowIndex: number;
+    label: string;
+    status: 'IN_PROGRESS' | 'SUCCESS' | 'FAILED' | 'SKIPPED_DUPLICATE' | 'REVIEW_REQUIRED';
+    erpRecordId?: string;
+    message?: string;
+    duration?: number;
+    progress: string;
+    percent: number;
+    kpis: {
+      total: number;
+      passed: number;
+      failed: number;
+      skipped: number;
+    };
+  }): void {
+    console.log(`@@EXECUTION_JSON@@${JSON.stringify({ ...data, timestamp: formatIst12Hr() })}`);
   }
 }

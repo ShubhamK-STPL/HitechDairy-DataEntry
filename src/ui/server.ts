@@ -61,6 +61,9 @@ interface RunParams {
   useAiIntelligence?: boolean;
   limit?: number;
   reportOnly?: boolean;
+  allowDummyMobile?: boolean;
+  startMobile?: string;
+  financialYearResponse?: string;
 }
 
 interface ActiveRunState {
@@ -70,12 +73,15 @@ interface ActiveRunState {
   exitCode?: number | null;
   params?: RunParams;
   logs: string[];
+  latestExecutionJson?: any;
+  recentJsonEvents: any[];
   process?: ChildProcess;
 }
 
 const runState: ActiveRunState = {
   running: false,
-  logs: []
+  logs: [],
+  recentJsonEvents: []
 };
 
 const sseClients = new Set<ServerResponse>();
@@ -123,6 +129,19 @@ function appendLogChunk(chunk: string): void {
   const lines = chunk.replace(/\r/g, '').split('\n');
   for (const line of lines) {
     if (!line) continue;
+    if (line.startsWith('@@EXECUTION_JSON@@')) {
+      try {
+        const jsonStr = line.slice('@@EXECUTION_JSON@@'.length);
+        const data = JSON.parse(jsonStr);
+        runState.latestExecutionJson = data;
+        runState.recentJsonEvents.push(data);
+        if (runState.recentJsonEvents.length > 50) {
+          runState.recentJsonEvents.shift();
+        }
+        broadcastSse('execution_json', data);
+      } catch {}
+      continue;
+    }
     runState.logs.push(line);
     if (runState.logs.length > MAX_LOG_LINES) {
       runState.logs.shift();
@@ -207,7 +226,8 @@ function inspectWorkbook(absPath: string) {
       };
 
       for (const rec of records) {
-        const status = String(rec.status || 'PENDING').trim().toUpperCase() || 'PENDING';
+        const raw = String(rec.status || 'PENDING').trim().toUpperCase() || 'PENDING';
+        const status = raw === '' ? 'PENDING' : raw;
         counts[status] = (counts[status] || 0) + 1;
       }
 
@@ -339,6 +359,8 @@ function startOnboardingRun(params: RunParams): void {
     params.headless ? '--headless' : '--headed',
     ...(params.retryFailed ? ['--retry-failed'] : []),
     ...(params.useAiIntelligence !== false ? ['--use-ai'] : ['--no-ai']),
+    ...(params.allowDummyMobile ? ['--dummy-mobile'] : []),
+    ...(params.allowDummyMobile && params.startMobile ? [`--start-mobile=${params.startMobile}`] : []),
     ...(params.limit && params.limit > 0 ? [`--limit=${Math.floor(params.limit)}`] : []),
     ...(params.reportOnly ? ['--report-only'] : [])
   ];
@@ -355,6 +377,8 @@ function startOnboardingRun(params: RunParams): void {
   runState.exitCode = undefined;
   runState.params = sanitizedParams;
   runState.logs = [];
+  runState.latestExecutionJson = undefined;
+  runState.recentJsonEvents = [];
 
   appendLogChunk(
     `[${formatIstTimeOnly12Hr()}] Launching on ${selectedEnv.label.toUpperCase()} (${selectedEnv.baseUrl})${customUsername ? ` as ${customUsername}` : ''}: tsx ${scriptArgs.join(' ')} (EXCEL_PATH=${params.excelFile})`
@@ -362,6 +386,19 @@ function startOnboardingRun(params: RunParams): void {
   broadcastSse('state', { running: true, startedAt: runState.startedAt, params: sanitizedParams });
 
   const isWin = process.platform === 'win32';
+
+  // Persist or clear custom GetFinancialYear JSON mock
+  const fyearConfigFile = path.resolve(WORKSPACE_ROOT, 'reports', '.fyear_response.json');
+  try {
+    if (!fs.existsSync(REPORTS_DIR)) fs.mkdirSync(REPORTS_DIR, { recursive: true });
+    if (params.financialYearResponse && params.financialYearResponse.trim()) {
+      fs.writeFileSync(fyearConfigFile, params.financialYearResponse.trim(), 'utf-8');
+      appendLogChunk(`[${formatIstTimeOnly12Hr()}] Custom GetFinancialYear response configured.`);
+    } else if (fs.existsSync(fyearConfigFile)) {
+      fs.unlinkSync(fyearConfigFile);
+    }
+  } catch {}
+
   const child = spawn(
     isWin ? 'cmd.exe' : 'tsx',
     isWin ? ['/c', 'tsx', ...scriptArgs] : scriptArgs,
@@ -375,6 +412,9 @@ function startOnboardingRun(params: RunParams): void {
         ...(customPassword ? { ADMIN_PASSWORD: customPassword } : {}),
         EXCEL_PATH: absExcelPath,
         USE_AI_INTELLIGENCE: params.useAiIntelligence !== false ? 'true' : 'false',
+        ALLOW_DUMMY_MOBILE: params.allowDummyMobile ? 'true' : 'false',
+        ...(params.allowDummyMobile && params.startMobile ? { START_DUMMY_MOBILE: params.startMobile } : {}),
+        ...(params.financialYearResponse ? { GET_FINANCIAL_YEAR_RESPONSE: params.financialYearResponse.trim() } : {}),
         OPEN_HTML_REPORT: 'false',
         FORCE_COLOR: '0'
       }
@@ -517,6 +557,8 @@ const server = http.createServer(async (req, res) => {
         exitCode: runState.exitCode,
         params: runState.params,
         logs: runState.logs,
+        latestExecutionJson: runState.latestExecutionJson,
+        recentJsonEvents: runState.recentJsonEvents,
         latestReport: history[0] || null,
         history,
         reportExists: fs.existsSync(path.join(REPORTS_DIR, 'run_summary.html')),

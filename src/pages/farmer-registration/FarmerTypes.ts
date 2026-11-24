@@ -29,7 +29,6 @@ export interface FarmerRecord {
   agriStackId?: string;                         // Agri Stack Id
 
   // Milk Type Account Code
-  accountCode?: string;                         // Fallback single account code
   buffaloAccountCode?: string;                  // Buffalo fill if has value
   cowAccountCode?: string;                      // Cow fill if has value
   kovaleDudhAccountCode?: string;               // Kovale Dudh fill if has value
@@ -45,9 +44,10 @@ export interface FarmerRecord {
   // 5. Additional Details
   panNo?: string;                               // PAN No.
   aadharNumber?: string;                        // Aadhar Number
+  farmerStatus?: string;                        // Status column (e.g. Active/Inactive)
 
   // Execution tracking
-  status?: string;                              // Execution status from Excel Status column
+  status?: string;                              // Execution status from Excel Run_Status column
   rowIndex?: number;                            // 0-based row index in sheet (where 0 is header, 1 is row 2 in Excel)
 }
 

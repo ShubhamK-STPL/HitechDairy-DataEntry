@@ -9,6 +9,7 @@ const FARMER_KNOWN_HEADERS = [
   'Contact Number',
   'Select Purchase Ratecard Group',
   'Select Route Name',
+  'Run_Status',
   'Status'
 ];
 
@@ -24,14 +25,15 @@ export function readFarmerRecordsFromExcel(
       status,
       rowIndex
     }))
-    .filter(f => f.nameInEnglish !== '' || f.contactNumber !== '' || f.accountCode !== '' || f.cowAccountCode !== '' || f.buffaloAccountCode !== '');
+    .filter(f => f.nameInEnglish !== '' || f.contactNumber !== '' || f.cowAccountCode !== '' || f.buffaloAccountCode !== '');
 }
 
 function normalizeFarmerRow(row: Record<string, any>, index: number): FarmerRecord {
-  const getField = (aliases: string[]): string => {
+  const getField = (aliases: string[], ignoreIfsc = false): string => {
     // Pass 1: exact normalized match
     for (const [key, val] of Object.entries(row)) {
       const cleanKey = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (ignoreIfsc && cleanKey.includes('ifsc')) continue;
       for (const alias of aliases) {
         const cleanAlias = alias.toLowerCase().replace(/[^a-z0-9]/g, '');
         if (cleanKey === cleanAlias) {
@@ -39,12 +41,14 @@ function normalizeFarmerRow(row: Record<string, any>, index: number): FarmerReco
         }
       }
     }
-    // Pass 2: substring match (for longer aliases)
+    // Pass 2: substring match (for longer aliases, skip generic short aliases <= 4)
     for (const [key, val] of Object.entries(row)) {
       const cleanKey = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (ignoreIfsc && cleanKey.includes('ifsc')) continue;
       for (const alias of aliases) {
         const cleanAlias = alias.toLowerCase().replace(/[^a-z0-9]/g, '');
-        if (cleanAlias.length >= 4 && cleanKey.includes(cleanAlias)) {
+        if (cleanAlias.length <= 4) continue;
+        if (cleanKey.includes(cleanAlias)) {
           return String(val ?? '').trim();
         }
       }
@@ -71,9 +75,7 @@ function normalizeFarmerRow(row: Record<string, any>, index: number): FarmerReco
   const nameInEnglish = getField([
     'Name In English',
     'Name in English',
-    'Name in English /Name in regional Language',
-    'Farmer Name',
-    'Name'
+    'Farmer Name'
   ]);
 
   const nameInRegional = getField([
@@ -95,7 +97,17 @@ function normalizeFarmerRow(row: Record<string, any>, index: number): FarmerReco
     'Mobile',
     'Phone'
   ]);
-  const contactNumber = rawPhone.replace(/\D/g, '').slice(-10);
+
+  if (rawPhone && /[,/;&|]|\bor\b/i.test(rawPhone)) {
+    throw new Error(`[Excel Read Error] Multi-phone numbers detected in Contact Number: "${rawPhone}" (Record ${index + 1}: "${nameInEnglish || 'Unknown'}"). Only a single 10-digit mobile number starting with 6-9 is allowed per farmer.`);
+  }
+
+  const rawPhoneDigits = rawPhone.replace(/\D/g, '');
+  if (rawPhoneDigits.length > 10 && !rawPhoneDigits.startsWith('91') && !rawPhoneDigits.startsWith('0')) {
+    throw new Error(`[Excel Read Error] Multi-phone or invalid digit count (${rawPhoneDigits.length} digits) detected in Contact Number: "${rawPhone}" (Record ${index + 1}: "${nameInEnglish || 'Unknown'}").`);
+  }
+
+  const contactNumber = rawPhoneDigits.slice(-10);
 
   const emailId = getField([
     'Email ID',
@@ -144,28 +156,39 @@ function normalizeFarmerRow(row: Record<string, any>, index: number): FarmerReco
   const cowAccountCode = getField(['Cow', 'Cow Account Code']);
   const kovaleDudhAccountCode = getField(['Kovale Dudh', 'Kovale Dudh Account Code', 'Kovale']);
 
-  const rawCode = getField([
-    'Account code',
-    'Account Code',
-    'Account No',
-    'Acc Code',
-    'Code'
-  ]);
-  const accountCode = rawCode.replace(/\.0$/, '').trim();
+  // 4. Bank Details (all-or-nothing: if ANY of the 6 bank fields is missing, skip entire bank section)
+  const rawBankName = getField(['Select Bank', 'Bank Name', 'Bank']).trim();
+  const rawAccountHolder = getField(['Account Holder Name', 'Holder Name']).trim();
+  const rawAccountType = getField(['Account Type', 'Bank Account Type']).trim();
+  const rawAccountNumber = getField(['Account Number', 'Bank Account Number', 'Account No']).trim();
+  const rawIfsc = getField(['IFSC Code', 'IFSC']).toUpperCase().trim();
+  const rawBranch = getField(['Branch Name', 'Branch']).trim();
 
-  // 4. Bank Details (skip all following fields if Select Bank is empty)
-  const rawBankName = getField(['Select Bank', 'Bank Name', 'Bank']);
-  const hasBank = Boolean(rawBankName && rawBankName.trim());
-  const bankName = hasBank ? rawBankName.trim() : '';
-  const accountHolderName = hasBank ? getField(['Account Holder Name', 'Holder Name']) : '';
-  const accountType = hasBank ? getField(['Account Type', 'Bank Account Type']) : '';
-  const accountNumber = hasBank ? getField(['Account Number', 'Bank Account Number', 'Account No']) : '';
-  const ifscCode = hasBank ? getField(['IFSC Code', 'IFSC']).toUpperCase() : '';
-  const branchName = hasBank ? getField(['Branch Name', 'Branch']) : '';
+  // All 6 bank fields must be non-empty to add bank details
+  const hasCompleteBankDetails = Boolean(
+    rawBankName &&
+    rawAccountHolder &&
+    rawAccountType &&
+    rawAccountNumber &&
+    rawIfsc &&
+    rawBranch
+  );
 
-  // 5. Additional Details
-  const panNo = getField(['PAN No.', 'PAN No', 'PAN Number', 'PAN']);
-  const aadharNumber = getField(['Aadhar Number', 'Aadhar No', 'Aadhar']);
+  const bankName = hasCompleteBankDetails ? rawBankName : '';
+  const accountHolderName = hasCompleteBankDetails ? rawAccountHolder : '';
+  const accountType = hasCompleteBankDetails ? rawAccountType : '';
+  const accountNumber = hasCompleteBankDetails ? rawAccountNumber : '';
+  const ifscCode = hasCompleteBankDetails ? rawIfsc : '';
+  const branchName = hasCompleteBankDetails ? rawBranch : '';
+
+  // 5. Additional Details (Strict validation: invalid PAN or Aadhar left blank)
+  const rawPan = getField(['PAN No.', 'PAN No', 'PAN Number', 'PAN']).trim().toUpperCase();
+  const panNo = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(rawPan) ? rawPan : '';
+
+  const rawAadhar = getField(['Aadhar Number', 'Aadhar No', 'Aadhar']).replace(/\D/g, '').trim();
+  const aadharNumber = /^\d{12}$/.test(rawAadhar) ? rawAadhar : '';
+
+  const farmerStatus = getField(['Status', 'Farmer Status', 'Status (Active/Inactive)']);
 
   return {
     organizationName,
@@ -186,7 +209,6 @@ function normalizeFarmerRow(row: Record<string, any>, index: number): FarmerReco
     routeName,
     nddbFarmerId,
     agriStackId,
-    accountCode,
     buffaloAccountCode,
     cowAccountCode,
     kovaleDudhAccountCode,
@@ -197,6 +219,7 @@ function normalizeFarmerRow(row: Record<string, any>, index: number): FarmerReco
     ifscCode,
     branchName,
     panNo,
-    aadharNumber
+    aadharNumber,
+    farmerStatus
   };
 }

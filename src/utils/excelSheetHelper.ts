@@ -164,7 +164,7 @@ export function readSheetRows(
     rows.push({
       raw,
       rowIndex: headerRowIndex + 1 + i,
-      status: String(raw['Status'] || raw['status'] || '').trim()
+      status: String(raw['Run_Status'] || raw['run_status'] || raw['RunStatus'] || '').trim()
     });
   }
 

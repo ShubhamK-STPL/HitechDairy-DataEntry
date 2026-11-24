@@ -5,6 +5,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { GroqIntelligenceService } from '../../services/groqIntelligenceService';
 import { ENV } from '../../config/envConfig';
+import { DummyMobileAllocator } from '../../utils/dummyMobileAllocator';
 
 export class CustomerRegistrationPage extends BasePage {
   // 1. Basic Details Locators
@@ -246,7 +247,11 @@ export class CustomerRegistrationPage extends BasePage {
     await this.selectRadio(this.categoryRadioGroup, category);
 
     // Contact Number *
-    const contact = customer.contactNumber || customer.mobileNo;
+    let contact = customer.contactNumber || customer.mobileNo;
+    if (process.env.ALLOW_DUMMY_MOBILE === 'true') {
+      contact = DummyMobileAllocator.claimNextMobile();
+      console.log(`📱 [Dummy Mobile] Allocated customer mobile: ${contact}`);
+    }
     if (contact) {
       const cleanPhone = contact.replace(/\D/g, '').slice(-10);
       await this.eleUtil.fill(this.contactNumberInput, cleanPhone);
@@ -312,10 +317,18 @@ export class CustomerRegistrationPage extends BasePage {
     }
 
     // ---------------------------------------------------------
-    // 3. BANK DETAILS (skip all fields if Select Bank is empty)
+    // 3. BANK DETAILS (only proceed if ALL 6 bank details are available)
     // ---------------------------------------------------------
-    const hasBank = Boolean(customer.bankName && customer.bankName.trim());
-    if (hasBank && (await this.eleUtil.isVisible(this.bankSelect, 1500))) {
+    const hasCompleteBankDetails = Boolean(
+      customer.bankName?.trim() &&
+      customer.accountHolderName?.trim() &&
+      (customer.accountType || customer.bankAccType)?.trim() &&
+      (customer.accountNumber || customer.accountNo)?.trim() &&
+      customer.ifscCode?.trim() &&
+      customer.branchName?.trim()
+    );
+
+    if (hasCompleteBankDetails && (await this.eleUtil.isVisible(this.bankSelect, 1500))) {
       await this.selectMatOption(this.bankSelect, customer.bankName!.trim());
       await this.waitForStep(400);
 
@@ -341,7 +354,7 @@ export class CustomerRegistrationPage extends BasePage {
         await this.eleUtil.fill(this.branchNameInput, customer.branchName.trim());
       }
     } else {
-      console.log('ℹ️ Select Bank is empty. Skipping Account Holder Name, Account Type, Account Number, IFSC Code, and Branch Name.');
+      console.log('ℹ️ Incomplete bank details (one or more of Bank, Holder, Type, AccNo, IFSC, Branch missing). Skipping bank section entirely.');
     }
 
     // ---------------------------------------------------------

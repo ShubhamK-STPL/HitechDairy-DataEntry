@@ -25,6 +25,8 @@ export interface ExecutionSettings {
   useAiIntelligence: boolean;
   limit?: number;
   reportOnly: boolean;
+  allowDummyMobile: boolean;
+  startDummyMobile?: string;
 }
 
 const VALID_MODULES: OnboardingModuleName[] = ['Products', 'Variants', 'VariantsV2', 'Customers', 'Suppliers', 'Farmers', 'SalesInvoices', 'AccountTransactions'];
@@ -111,6 +113,9 @@ export function getExecutionSettings(argv: string[] = process.argv.slice(2)): Ex
   const slowMo = Math.max(0, Number(process.env.SLOW_MO || 50));
   const reportOnly = argv.includes('--report-only');
 
+  const allowDummyMobile = argv.includes('--dummy-mobile') || process.env.ALLOW_DUMMY_MOBILE === 'true';
+  const startDummyMobile = getCliValue(argv, 'start-mobile') || process.env.START_DUMMY_MOBILE;
+
   return {
     parallel,
     workerCount,
@@ -122,7 +127,9 @@ export function getExecutionSettings(argv: string[] = process.argv.slice(2)): Ex
     retryFailed,
     useAiIntelligence,
     limit,
-    reportOnly
+    reportOnly,
+    allowDummyMobile,
+    startDummyMobile
   };
 }
 

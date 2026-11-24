@@ -5,6 +5,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { GroqIntelligenceService } from '../../services/groqIntelligenceService';
 import { ENV } from '../../config/envConfig';
+import { DummyMobileAllocator } from '../../utils/dummyMobileAllocator';
 
 export class SupplierRegistrationPage extends BasePage {
   // Basic Details Locators
@@ -241,7 +242,11 @@ export class SupplierRegistrationPage extends BasePage {
       await this.selectRadio(this.categoryRadioGroup, record.category);
     }
 
-    const contact = record.mobileNo || record.contactNumber;
+    let contact = record.mobileNo || record.contactNumber;
+    if (process.env.ALLOW_DUMMY_MOBILE === 'true') {
+      contact = DummyMobileAllocator.claimNextMobile();
+      console.log(`📱 [Dummy Mobile] Allocated supplier mobile: ${contact}`);
+    }
     if (contact) {
       await this.eleUtil.fill(this.mobileNoInput, contact);
     }
@@ -276,9 +281,17 @@ export class SupplierRegistrationPage extends BasePage {
       await this.eleUtil.fill(this.addressTextarea, addressText);
     }
 
-    // 4. Bank Details (skip all fields if Select Bank is empty)
-    const hasBank = Boolean(record.bankName && record.bankName.trim());
-    if (hasBank) {
+    // 4. Bank Details (only proceed if ALL 6 bank details are available)
+    const hasCompleteBank = Boolean(
+      record.bankName?.trim() &&
+      record.accountHolderName?.trim() &&
+      (record.bankAccType || record.accountType)?.trim() &&
+      (record.accountNo || record.accountNumber)?.trim() &&
+      record.ifscCode?.trim() &&
+      record.branchName?.trim()
+    );
+
+    if (hasCompleteBank) {
       await this.selectMatOption(this.bankSelect, record.bankName!.trim());
 
       if (record.accountHolderName && (await this.accountHolderNameInput.isEnabled())) {
@@ -308,7 +321,7 @@ export class SupplierRegistrationPage extends BasePage {
         await this.uploadDocument(bankSection, record.passbookChequeFile);
       }
     } else {
-      console.log('ℹ️ Select Bank is empty. Skipping Account Holder Name, Account Type, Account Number, IFSC Code, and Branch Name.');
+      console.log('ℹ️ Incomplete bank details (one or more of Bank, Holder, Type, AccNo, IFSC, Branch missing). Skipping bank section entirely.');
     }
 
     // 5. Additional Details - optional fill only if excel has value

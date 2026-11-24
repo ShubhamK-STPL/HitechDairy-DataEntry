@@ -15,6 +15,7 @@ import { SupplierRegistrationPage } from '../pages/supplier-registration/Supplie
 import { FarmerRegistrationPage } from '../pages/farmer-registration/FarmerRegistrationPage';
 import { SalesInvoicePage } from '../pages/sales-invoice/SalesInvoicePage';
 import { AccountTransactionPage } from '../pages/account-transaction/AccountTransactionPage';
+import { DummyMobileAllocator } from '../utils/dummyMobileAllocator';
 
 export interface BaseImportRecord {
   status?: string;
@@ -129,7 +130,10 @@ export function getModuleAdapter(moduleName: OnboardingModuleName): OnboardingMo
         createSessionRunner: (page) => {
           const pom = new CustomerRegistrationPage(page);
           return {
-            prepare: async () => { await pom.goto(); },
+            prepare: async () => {
+              await DummyMobileAllocator.resolveOrganizationIdFromPage(page);
+              await pom.goto();
+            },
             createAndSubmit: async (r) => {
               await pom.goto();
               await pom.fillForm(r);
@@ -151,7 +155,10 @@ export function getModuleAdapter(moduleName: OnboardingModuleName): OnboardingMo
         createSessionRunner: (page) => {
           const pom = new SupplierRegistrationPage(page);
           return {
-            prepare: async () => { await pom.goto(); },
+            prepare: async () => {
+              await DummyMobileAllocator.resolveOrganizationIdFromPage(page);
+              await pom.goto();
+            },
             createAndSubmit: async (r) => {
               await pom.goto();
               await pom.fillForm(r);
@@ -168,12 +175,15 @@ export function getModuleAdapter(moduleName: OnboardingModuleName): OnboardingMo
         sheetCandidates: ['Farmers', 'Farmer'],
         entryUrl: ENV.FARMER_ENTRY_URL,
         readRecords: (excelPath) => readFarmerRecordsFromExcel(excelPath, ['Farmers', 'Farmer']),
-        getRecordKey: (r) => String(r.contactNumber || r.accountCode || r.nameInEnglish || '').trim(),
-        getDisplayLabel: (r) => `${r.nameInEnglish} (${r.contactNumber || r.accountCode || 'N/A'})`,
+        getRecordKey: (r) => String(r.contactNumber || r.cowAccountCode || r.buffaloAccountCode || r.nameInEnglish || '').trim(),
+        getDisplayLabel: (r) => `${r.nameInEnglish} (${r.contactNumber || r.cowAccountCode || r.buffaloAccountCode || 'N/A'})`,
         createSessionRunner: (page) => {
           const pom = new FarmerRegistrationPage(page);
           return {
-            prepare: async () => { await pom.goto(); },
+            prepare: async () => {
+              await DummyMobileAllocator.resolveOrganizationIdFromPage(page);
+              await pom.goto();
+            },
             createAndSubmit: async (r) => {
               await pom.goto();
               await pom.fillForm(r);

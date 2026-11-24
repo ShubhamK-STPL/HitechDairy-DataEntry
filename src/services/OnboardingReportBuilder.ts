@@ -11,6 +11,7 @@ const REPORT_KNOWN_HEADERS = [
   'Supplier Name',
   'Customer Name',
   'Farmer Name',
+  'Run_Status',
   'Status',
   'WorkerId',
   'ErpRecordId',
@@ -111,7 +112,7 @@ export function buildFullSheetReportRecords(
     }
 
     const excelStatus = (
-      readRawColumn(raw, ['Status']) ||
+      readRawColumn(raw, ['Run_Status', 'run_status', 'RunStatus']) ||
       String(record.status || '').trim() ||
       'PENDING'
     ).toUpperCase();

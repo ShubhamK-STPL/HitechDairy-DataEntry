@@ -423,7 +423,35 @@
           <label class="check-label" title="Engage Groq AI autonomous diagnostics and self-healing for test failures">
             <input type="checkbox" id="ai-intelligence" checked /> 🤖 AI Intelligence
           </label>
+          <label class="check-label" title="Generate dummy sequential mobile numbers (600{orgId}XXXX) for customer/supplier/farmer onboarding">
+            <input type="checkbox" id="dummy-mobile" /> 📱 Allow Dummy Mobile
+          </label>
         </div>
+
+        <div id="dummy-mobile-config" style="display:none; margin-bottom:1rem; padding:0.75rem; border-radius:var(--radius-sm); background:var(--bg-alt); border:1px solid var(--border);">
+          <label class="field-label" for="start-mobile-input" style="font-size:0.8rem; margin-bottom:0.35rem;">
+            Starting Dummy Mobile Number (Optional)
+          </label>
+          <input type="text" id="start-mobile-input" class="input" maxlength="10" placeholder="Defaults to 600{orgId}0001 (e.g. 6004170001)" />
+          <div style="font-size:0.72rem; color:var(--text-secondary); margin-top:0.3rem;">
+            Leave blank to use <code>600{orgId}0001</code> (orgId from login API in 3 digits + 4-digit sequence starting at 0001).
+          </div>
+        </div>
+
+        <details id="fyear-details" style="margin-bottom:1rem; border:1px solid var(--border); border-radius:var(--radius-sm); padding:0.6rem 0.75rem; background:var(--bg-alt);">
+          <summary style="cursor:pointer; font-size:0.8rem; font-weight:600; color:var(--text-secondary); user-select:none;">
+            📅 Custom GetFinancialYear Response (Expand / Collapse)
+          </summary>
+          <div style="margin-top:0.65rem;">
+            <label class="field-label" for="fyear-response-input" style="font-size:0.75rem; margin-bottom:0.3rem;">
+              Mock JSON Response for <code>MasterDropdown/GetFinancialYear</code>
+            </label>
+            <textarea id="fyear-response-input" rows="3" placeholder='Optional. Leave blank to use live portal API.' style="width:100%; font-family:var(--font-mono); font-size:0.72rem; border:1px solid var(--border); border-radius:var(--radius-sm); padding:0.4rem 0.5rem; background:var(--bg-surface); color:var(--text-main); resize:vertical;"></textarea>
+            <div style="font-size:0.7rem; color:var(--text-secondary); margin-top:0.25rem;">
+              Paste JSON here if live portal fails to return financial years.
+            </div>
+          </div>
+        </details>
 
         <div style="margin-top:1.25rem; display:flex; gap:0.75rem; flex-wrap:wrap;">
           <button type="button" id="trigger-btn" class="btn btn-primary" style="flex:1;">
@@ -573,6 +601,11 @@
       }
     }
 
+    document.getElementById('dummy-mobile')?.addEventListener('change', (e) => {
+      const cfg = document.getElementById('dummy-mobile-config');
+      if (cfg) cfg.style.display = e.target.checked ? 'block' : 'none';
+    });
+
     // Trigger Run
     const triggerBtn = document.getElementById('trigger-btn');
     triggerBtn.addEventListener('click', async () => {
@@ -588,6 +621,9 @@
           parallel: document.getElementById('workers-count').value !== '1',
           retryFailed: document.getElementById('retry-failed').checked,
           useAiIntelligence: document.getElementById('ai-intelligence').checked,
+          allowDummyMobile: document.getElementById('dummy-mobile')?.checked || false,
+          startMobile: document.getElementById('dummy-mobile')?.checked ? document.getElementById('start-mobile-input')?.value.trim() : undefined,
+          financialYearResponse: document.getElementById('fyear-response-input')?.value.trim() || undefined,
           limit: document.getElementById('limit-count').value ? Number(document.getElementById('limit-count').value) : 0,
           fileName: currentFile?.name,
           fileBase64: currentFileBase64

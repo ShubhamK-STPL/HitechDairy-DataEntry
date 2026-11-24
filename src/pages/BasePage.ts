@@ -22,6 +22,64 @@ export class BasePage {
   }
 
   /**
+   * Universal, resilient Angular Material mat-select option selector with 4-tier pointer interception handling.
+   * Resolves issues where MDC floating labels (<mat-label>) or outlines intercept click events.
+   */
+  async selectMatOption(selectLocator: Locator, optionText?: string | null, timeoutMs = 10000): Promise<this> {
+    if (!optionText) return this;
+    const cleanOption = optionText.trim();
+
+    const isVisible = await this.eleUtil.isVisible(selectLocator, 2000);
+    if (!isVisible) return this;
+
+    await selectLocator.waitFor({ state: 'attached', timeout: timeoutMs });
+    const currentText = (await selectLocator.innerText().catch(() => '')).trim();
+    if (currentText && currentText.toLowerCase().includes(cleanOption.toLowerCase())) {
+      return this;
+    }
+
+    await selectLocator.scrollIntoViewIfNeeded();
+
+    // 4-Tier fallback to overcome MDC pointer interception
+    try {
+      await selectLocator.click({ timeout: 2500 });
+    } catch {
+      try {
+        await selectLocator.click({ force: true, timeout: 2500 });
+      } catch {
+        const formField = selectLocator.locator('xpath=ancestor::mat-form-field').first();
+        if (await formField.isVisible().catch(() => false)) {
+          await formField.click({ force: true, timeout: 2500 }).catch(() => {});
+        } else {
+          await selectLocator.focus().catch(() => {});
+          await this.page.keyboard.press('Space').catch(() => {});
+        }
+      }
+    }
+
+    const overlay = this.page.locator('.cdk-overlay-container, mat-select-panel, .mat-mdc-select-panel');
+    await overlay.locator('mat-option, [role="option"]').first().waitFor({ state: 'visible', timeout: timeoutMs }).catch(() => {});
+
+    const escaped = this.escapeRegExp(cleanOption);
+    const option = overlay.locator('mat-option, [role="option"]').filter({
+      hasText: new RegExp(`^\\s*${escaped}\\s*$`, 'i')
+    }).or(
+      overlay.locator('mat-option, [role="option"]').filter({
+        hasText: new RegExp(escaped, 'i')
+      })
+    ).first();
+
+    await option.waitFor({ state: 'visible', timeout: timeoutMs });
+    try {
+      await option.click({ timeout: 3000 });
+    } catch {
+      await option.click({ force: true, timeout: 3000 });
+    }
+    await this.waitForStep(300);
+    return this;
+  }
+
+  /**
    * Selects an option directly from an open Angular Material dropdown without searching
    */
   async selectVisibleOption(optionText: string | RegExp): Promise<void> {

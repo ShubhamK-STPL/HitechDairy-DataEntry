@@ -44,6 +44,7 @@
     "customer:test": "playwright test tests/customer-registration.spec.ts --headed",
     "customer:debug": "node scripts/debugger.mjs tests/customer-registration.spec.ts",
     "farmer:sample": "node scripts/create-sample-farmer-excel.mjs",
+    "farmer:verify": "tsx scripts/verify-farmer-records.ts",
     "farmer:validate": "node scripts/validate-farmer-excel.mjs",
     "farmer:import": "node scripts/import-farmer-records.mjs",
     "farmer:import:headed": "node scripts/import-farmer-records.mjs --headed",
