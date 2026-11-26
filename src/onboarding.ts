@@ -11,6 +11,7 @@ import { buildFullSheetReportRecords } from './services/OnboardingReportBuilder'
 import { CustomHistoryReporter, type TestRecordSummary } from './utils/CustomHistoryReporter';
 import { assertExcelFileWritable } from './utils/excelSheetHelper';
 import { DummyMobileAllocator } from './utils/dummyMobileAllocator';
+import { VariantSequenceAllocator } from './utils/variantSequenceAllocator';
 import { runFarmerVerification } from '../scripts/verify-farmer-records';
 
 /**
@@ -126,6 +127,10 @@ async function main() {
   }
 
   process.env.USE_AI_INTELLIGENCE = settings.useAiIntelligence ? 'true' : 'false';
+
+  if (settings.module === 'Variants' || settings.module === 'VariantsV2') {
+    VariantSequenceAllocator.resetSequence();
+  }
 
   if (settings.allowDummyMobile) {
     process.env.ALLOW_DUMMY_MOBILE = 'true';

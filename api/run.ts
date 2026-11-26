@@ -11,6 +11,7 @@ interface RunPayload {
   useAiIntelligence?: boolean;
   allowDummyMobile?: boolean;
   startMobile?: string;
+  financialYearResponse?: string;
   limit?: number;
 }
 
@@ -72,7 +73,9 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     const rawBody = await readBody(req);
     const body: RunPayload = rawBody ? JSON.parse(rawBody) : {};
 
-    const moduleName = body.module || 'Products';
+    const rawModule = body.module || 'Products';
+    const moduleName = rawModule === 'VariantsV2' ? 'Variants' : rawModule;
+    const allowDummyMobile = Boolean(body.allowDummyMobile && ['Farmers', 'Customers', 'Suppliers'].includes(moduleName));
     const envTarget = body.env || 'demo';
     const workers = Math.max(1, Math.min(4, Number(body.workers || 2)));
     const parallel = body.parallel !== false;
@@ -135,8 +138,9 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
           workers: String(workers),
           parallel: String(parallel),
           retry_failed: String(retryFailed),
-          allow_dummy_mobile: String(Boolean(body.allowDummyMobile)),
-          start_dummy_mobile: body.allowDummyMobile && body.startMobile ? String(body.startMobile).trim() : '',
+          allow_dummy_mobile: String(allowDummyMobile),
+          start_dummy_mobile: allowDummyMobile && body.startMobile ? String(body.startMobile).trim() : '',
+          financial_year_response: body.financialYearResponse ? String(body.financialYearResponse).trim() : '',
           limit: String(limit),
           excel_file_path: excelFilePath,
           run_id: runId

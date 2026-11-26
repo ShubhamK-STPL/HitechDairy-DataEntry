@@ -4,6 +4,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import dotenv from 'dotenv';
 import { LoginPage } from '../src/pages/LoginPage';
+import { setInputFilesFromPathOrUrl } from '../src/utils/imageUploadHelper';
 
 dotenv.config();
 
@@ -412,29 +413,13 @@ async function uploadVariantImage(
   page: Page,
   imagePathFromExcel: string
 ): Promise<void> {
-  let imagePath = clean(imagePathFromExcel);
-
-  if (!imagePath) {
-    imagePath = process.env.DEFAULT_PRODUCT_IMAGE_PATH || 'test-data/Hitech_default-logo.png';
-  }
-
-  const resolvedPath = path.isAbsolute(imagePath)
-    ? imagePath
-    : path.resolve(process.cwd(), imagePath);
-
-  if (!fs.existsSync(resolvedPath)) {
-    console.warn(`Image file not found: ${resolvedPath}. Skipping image upload.`);
-    return;
-  }
-
+  const imagePath = clean(imagePathFromExcel);
   const fileInput = page.locator(
     'input#fileDropRef[type="file"]'
   );
 
-  await fileInput.waitFor({ state: 'attached', timeout: 10000 });
-  await fileInput.setInputFiles(resolvedPath);
-
-  console.log(`Image selected: ${resolvedPath}`);
+  const selectedSource = await setInputFilesFromPathOrUrl(page, fileInput, imagePath, 'Variant');
+  console.log(`Image selected: ${selectedSource}`);
 
   // Wait for upload spinner if triggered by image selection
   const spinner = page.locator('.ngx-spinner-overlay, ngx-spinner').first();

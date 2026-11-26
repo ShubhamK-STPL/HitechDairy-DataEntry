@@ -47,7 +47,7 @@ function normalizeInvoiceRow(row: Record<string, any>, _index: number): SalesInv
     return '';
   };
 
-  const unitName = getField(['unitName', 'Unit Name', 'unit', 'Unit', 'Select Unit Name']) || process.env.DEFAULT_UNIT || '';
+  const unitName = getField(['unitName', 'Unit Name', 'unit', 'Unit', 'Select Unit Name']);
   const partyName = getField(['partyName', 'Party Name', 'party', 'Customer Name', 'customerName', 'farmerCode']);
   const invoiceDate = getField(['invoiceDate', 'Invoice Date', 'date', 'Date', 'Sales Invoice Date']);
   const discountPercent = getField(['discountPercent', 'Discount Percent', 'discount%']) || '0';

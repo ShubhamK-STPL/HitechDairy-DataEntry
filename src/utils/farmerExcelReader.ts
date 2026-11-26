@@ -63,14 +63,14 @@ function normalizeFarmerRow(row: Record<string, any>, index: number): FarmerReco
     'Organization',
     'orgName',
     'Org'
-  ]) || process.env.DEFAULT_ORGANIZATION || '';
+  ]);
 
   const unitName = getField([
     'Select Unit Name',
     'Unit Name',
     'Unit',
     'unitName'
-  ]) || process.env.DEFAULT_UNIT || '';
+  ]);
 
   const nameInEnglish = getField([
     'Name In English',

@@ -12,6 +12,7 @@ export interface CustomerRecord {
   nameInRegional?: string;                            // Name In Regional Language *
   regionalName?: string;                              // Alias for Name In Regional Language *
   category?: 'Company' | 'Individual' | string;       // Select Category [Company, Individual] *
+  customerCode?: string;                              // Customer Code (empty -> system suggested)
   contactNumber: string;                              // Contact Number *
   mobileNo?: string;                                  // Alias for Contact Number *
   emailId?: string;                                   // Email ID

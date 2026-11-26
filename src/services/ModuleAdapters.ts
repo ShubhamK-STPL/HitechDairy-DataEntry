@@ -10,6 +10,7 @@ import { readSalesInvoiceRecordsFromExcel } from '../utils/salesInvoiceExcelRead
 import { readAccountTransactionRecordsFromExcel } from '../utils/accountTransactionExcelReader';
 import { ProductRegistrationPage } from '../pages/product-registration/ProductRegistrationPage';
 import { ProductVariantPage } from '../pages/product-variant/ProductVariantPage';
+import type { ProductVariantRecord } from '../pages/product-variant/ProductVariantTypes';
 import { CustomerRegistrationPage } from '../pages/customer-registration/CustomerRegistrationPage';
 import { SupplierRegistrationPage } from '../pages/supplier-registration/SupplierRegistrationPage';
 import { FarmerRegistrationPage } from '../pages/farmer-registration/FarmerRegistrationPage';
@@ -49,6 +50,13 @@ export interface OnboardingModuleAdapter<T extends BaseImportRecord = BaseImport
   };
 }
 
+function getVariantRecordKey(r: ProductVariantRecord): string {
+  return [r.productName, r.variantName]
+    .map((v) => String(v || '').trim())
+    .filter(Boolean)
+    .join('::');
+}
+
 export function getModuleAdapter(moduleName: OnboardingModuleName): OnboardingModuleAdapter<any> {
   switch (moduleName) {
     case 'Products':
@@ -79,7 +87,7 @@ export function getModuleAdapter(moduleName: OnboardingModuleName): OnboardingMo
         sheetCandidates: ['Variants', 'ProductVariants'],
         entryUrl: ENV.PRODUCT_VARIANT_URL,
         readRecords: (excelPath) => readProductVariantRecordsFromExcel(excelPath, ['Variants', 'ProductVariants']),
-        getRecordKey: (r) => String(r.variantCode || r.variantName || '').trim(),
+        getRecordKey: getVariantRecordKey,
         getDisplayLabel: (r) => `${r.variantName || 'Variant'} (${r.variantCode || 'N/A'})`,
         createSessionRunner: (page) => {
           const pom = new ProductVariantPage(page);
@@ -102,7 +110,7 @@ export function getModuleAdapter(moduleName: OnboardingModuleName): OnboardingMo
         sheetCandidates: ['Variants', 'Variant', 'ProductVariants', 'Product Variants'],
         entryUrl: ENV.PRODUCT_VARIANT_URL,
         readRecords: (excelPath) => readProductVariantRecordsFromExcel(excelPath, ['Variants', 'Variant', 'ProductVariants', 'Product Variants']),
-        getRecordKey: (r) => String(r.variantCode || r.variantName || '').trim(),
+        getRecordKey: getVariantRecordKey,
         getDisplayLabel: (r) => `${r.variantName || 'Variant'} (${r.variantCode || 'N/A'}) [V2]`,
         createSessionRunner: (page) => {
           const pom = new ProductVariantPage(page);

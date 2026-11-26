@@ -359,10 +359,6 @@
               <div class="module-chip-title">Variants</div>
               <div class="module-chip-count" id="count-Variants">Pending file</div>
             </div>
-            <div class="module-chip" data-module="VariantsV2">
-              <div class="module-chip-title">Variants (V2)</div>
-              <div class="module-chip-count" id="count-VariantsV2">Pending file</div>
-            </div>
             <div class="module-chip" data-module="Customers">
               <div class="module-chip-title">Customers</div>
               <div class="module-chip-count" id="count-Customers">Pending file</div>
@@ -423,7 +419,7 @@
           <label class="check-label" title="Engage Groq AI autonomous diagnostics and self-healing for test failures">
             <input type="checkbox" id="ai-intelligence" checked /> 🤖 AI Intelligence
           </label>
-          <label class="check-label" title="Generate dummy sequential mobile numbers (600{orgId}XXXX) for customer/supplier/farmer onboarding">
+          <label id="dummy-mobile-label" class="check-label" style="display:none;" title="Generate dummy sequential mobile numbers (600{orgId}XXXX) for customer/supplier/farmer onboarding">
             <input type="checkbox" id="dummy-mobile" /> 📱 Allow Dummy Mobile
           </label>
         </div>
@@ -511,14 +507,34 @@
 
     // Module selection
     let selectedModule = 'Products';
+    const DUMMY_MOBILE_MODULES = new Set(['Farmers', 'Customers', 'Suppliers']);
+    const dummyMobileCheckbox = document.getElementById('dummy-mobile');
+    const dummyMobileLabel = document.getElementById('dummy-mobile-label');
+    const dummyMobileConfig = document.getElementById('dummy-mobile-config');
+
+    function updateDummyMobileVisibility() {
+      const allowed = DUMMY_MOBILE_MODULES.has(selectedModule);
+      if (dummyMobileLabel) {
+        dummyMobileLabel.style.display = allowed ? 'inline-flex' : 'none';
+      }
+      if (!allowed) {
+        if (dummyMobileCheckbox) dummyMobileCheckbox.checked = false;
+        if (dummyMobileConfig) dummyMobileConfig.style.display = 'none';
+      } else if (dummyMobileConfig) {
+        dummyMobileConfig.style.display = dummyMobileCheckbox?.checked ? 'block' : 'none';
+      }
+    }
+
     const moduleChips = document.querySelectorAll('.module-chip');
     moduleChips.forEach(chip => {
       chip.addEventListener('click', () => {
         moduleChips.forEach(c => c.classList.remove('active'));
         chip.classList.add('active');
         selectedModule = chip.dataset.module;
+        updateDummyMobileVisibility();
       });
     });
+    updateDummyMobileVisibility();
 
     // File handling
     let currentFile = null;
@@ -574,13 +590,12 @@
         const wb = XLSX.read(buffer, { type: 'array' });
         const sheetMap = {
           Products: ['Products', 'Product', 'PRODUCTS', 'ProductMaster'],
-          Variants: ['ProductVariants', 'Variants', 'Variant', 'Product_Variants'],
-          VariantsV2: ['ProductVariants', 'Variants', 'Variant', 'Product_Variants'],
-          Customers: ['CustomerRegistration', 'Customers', 'Customer'],
-          Suppliers: ['SupplierRegistration', 'Suppliers', 'Supplier'],
-          Farmers: ['FarmerRegistration', 'Farmers', 'Farmer'],
-          SalesInvoices: ['SalesInvoice', 'SalesInvoices', 'Sales_Invoices', 'Invoice'],
-          AccountTransactions: ['AccountTransactions', 'Transactions', 'AccountTransaction']
+          Variants: ['Variants', 'Variant', 'ProductVariants', 'Product Variants', 'Product_Variants'],
+          Customers: ['Customers', 'Customer', 'CustomerRegistration'],
+          Suppliers: ['Suppliers', 'Supplier', 'SupplierRegistration'],
+          Farmers: ['Farmers', 'Farmer', 'FarmerRegistration', 'FARMERS'],
+          SalesInvoices: ['Sale-Invoice', 'Sales Invoices', 'SalesInvoice', 'Sales-Invoice', 'Sale Invoice', 'Invoice', 'Invoices'],
+          AccountTransactions: ['Account-Transaction', 'Account Transaction', 'AccountTransactions', 'Transactions', 'Transaction', 'Account Management', 'Account-Management', 'Accounts']
         };
 
         for (const [mod, candidates] of Object.entries(sheetMap)) {
@@ -601,9 +616,8 @@
       }
     }
 
-    document.getElementById('dummy-mobile')?.addEventListener('change', (e) => {
-      const cfg = document.getElementById('dummy-mobile-config');
-      if (cfg) cfg.style.display = e.target.checked ? 'block' : 'none';
+    document.getElementById('dummy-mobile')?.addEventListener('change', () => {
+      updateDummyMobileVisibility();
     });
 
     // Trigger Run

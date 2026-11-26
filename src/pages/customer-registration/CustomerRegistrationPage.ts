@@ -14,6 +14,7 @@ export class CustomerRegistrationPage extends BasePage {
   readonly nameInEnglishInput: Locator;
   readonly nameInRegionalInput: Locator;
   readonly categoryRadioGroup: Locator;
+  readonly customerCodeInput: Locator;
   readonly contactNumberInput: Locator;
   readonly emailIdInput: Locator;
   readonly isBulkSalePartyCheckbox: Locator;
@@ -54,6 +55,7 @@ export class CustomerRegistrationPage extends BasePage {
     this.nameInEnglishInput = page.locator('input[formcontrolname="customerName"]');
     this.nameInRegionalInput = page.locator('input[formcontrolname="regionalName"]');
     this.categoryRadioGroup = page.locator('mat-radio-group[formcontrolname="categoryId"]');
+    this.customerCodeInput = page.locator('input[formcontrolname="customerCode"], input[formcontrolname="code"], input[placeholder*="Customer Code" i]').first();
     this.contactNumberInput = page.locator('input[formcontrolname="mobileNo"]');
     this.emailIdInput = page.locator('input[formcontrolname="emailId"]');
     this.isBulkSalePartyCheckbox = page.locator('mat-checkbox[formcontrolname="isBulkSaleParty"]');
@@ -208,7 +210,7 @@ export class CustomerRegistrationPage extends BasePage {
     // ---------------------------------------------------------
     // Organization (if present)
     if (!isOrgScoped) {
-      const orgName = customer.organizationName || process.env.DEFAULT_ORGANIZATION || '';
+      const orgName = customer.organizationName || '';
       const isOrgVisible = await this.eleUtil.isVisible(this.organizationSelect, 2000);
       if (isOrgVisible && orgName) {
         await this.selectMatOption(this.organizationSelect, orgName);
@@ -222,7 +224,7 @@ export class CustomerRegistrationPage extends BasePage {
 
     // Select Unit Name *
     if (!isUnitScoped) {
-      const unitName = customer.unitName || process.env.DEFAULT_UNIT || '';
+      const unitName = customer.unitName || '';
       const isUnitVisible = await this.eleUtil.isVisible(this.unitSelect, 2000);
       if (isUnitVisible && unitName) {
         await this.selectMatOption(this.unitSelect, unitName);
@@ -245,6 +247,36 @@ export class CustomerRegistrationPage extends BasePage {
     // Select Category [Company, Individual] * (default: Individual)
     const category = customer.category || 'Individual';
     await this.selectRadio(this.categoryRadioGroup, category);
+
+    // Customer Code (use Excel value if provided; otherwise keep/use system suggested value)
+    if (await this.eleUtil.isVisible(this.customerCodeInput, 1000)) {
+      const excelCustomerCode = String(customer.customerCode ?? '').trim();
+      if (excelCustomerCode) {
+        await this.eleUtil.fill(this.customerCodeInput, excelCustomerCode);
+        await this.customerCodeInput.blur();
+      } else {
+        const existingCode = (await this.customerCodeInput.inputValue().catch(() => '')).trim();
+        if (!existingCode) {
+          await this.eleUtil.click(this.customerCodeInput);
+          await this.customerCodeInput.focus();
+          await this.waitForStep(100);
+
+          const autoOption = this.page
+            .locator('.mat-mdc-autocomplete-panel mat-option, [role="listbox"] [role="option"]')
+            .first();
+
+          if (await this.eleUtil.isVisible(autoOption, 1500)) {
+            await autoOption.click();
+          } else {
+            await this.customerCodeInput.press('ArrowDown').catch(() => {});
+            if (await this.eleUtil.isVisible(autoOption, 1000)) {
+              await autoOption.click();
+            }
+          }
+          await this.customerCodeInput.blur();
+        }
+      }
+    }
 
     // Contact Number *
     let contact = customer.contactNumber || customer.mobileNo;

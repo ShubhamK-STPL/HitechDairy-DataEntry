@@ -166,8 +166,8 @@ export class SupplierRegistrationPage extends BasePage {
    * Sets up default organization & unit based on HitechDairy system setup.
    */
   async setupFormDefaults(defaults: { organization?: string; unit?: string } = {}): Promise<this> {
-    const org = defaults.organization || process.env.DEFAULT_ORGANIZATION || '';
-    const unit = defaults.unit || process.env.DEFAULT_UNIT || '';
+    const org = defaults.organization || '';
+    const unit = defaults.unit || '';
 
     if (!org && !unit) return this;
 

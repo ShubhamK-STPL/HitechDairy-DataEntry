@@ -1,239 +1,5 @@
 [
  {
-  "time": 1795072474439,
-  "duration": 252231.478,
-  "passed": 1,
-  "failed": 2,
-  "flaky": 0,
-  "skipped": 7,
-  "total": 10,
-  "tests": {
-   "setup::tests/auth.setup.ts::Global Authentication Setup - Login before all tests": [
-    "p",
-    6948
-   ],
-   "chromium::tests/product-variant.spec.ts::Product Variant Registration › [1/9] Variant: 61 ()": [
-    "s",
-    13
-   ],
-   "chromium::tests/product-variant.spec.ts::Product Variant Registration › [2/9] Variant: 62 ()": [
-    "s",
-    3
-   ],
-   "chromium::tests/product-variant.spec.ts::Product Variant Registration › [3/9] Variant: 63 ()": [
-    "s",
-    4
-   ],
-   "chromium::tests/product-variant.spec.ts::Product Variant Registration › [4/9] Variant: 64 ()": [
-    "s",
-    4
-   ],
-   "chromium::tests/product-variant.spec.ts::Product Variant Registration › [5/9] Variant: 65 ()": [
-    "s",
-    4
-   ],
-   "chromium::tests/product-variant.spec.ts::Product Variant Registration › [6/9] Variant: 66 (743)": [
-    "s",
-    9
-   ],
-   "chromium::tests/product-variant.spec.ts::Product Variant Registration › [7/9] Variant: 67 (564)": [
-    "f",
-    96225
-   ],
-   "chromium::tests/product-variant.spec.ts::Product Variant Registration › [8/9] Variant: 68 (111)": [
-    "f",
-    50490
-   ],
-   "chromium::tests/product-variant.spec.ts::Product Variant Registration › [9/9] Variant: 69 ()": [
-    "s",
-    7
-   ]
-  }
- },
- {
-  "time": 1795072885225,
-  "duration": 24615.185,
-  "passed": 0,
-  "failed": 1,
-  "flaky": 0,
-  "skipped": 9,
-  "total": 10,
-  "tests": {
-   "setup::tests/auth.setup.ts::Global Authentication Setup - Login before all tests": [
-    "f",
-    21390
-   ],
-   "chromium::tests/product-variant.spec.ts::Product Variant Registration › [1/9] Variant: 61 ()": [
-    "s",
-    0
-   ],
-   "chromium::tests/product-variant.spec.ts::Product Variant Registration › [2/9] Variant: 62 ()": [
-    "s",
-    0
-   ],
-   "chromium::tests/product-variant.spec.ts::Product Variant Registration › [3/9] Variant: 63 ()": [
-    "s",
-    0
-   ],
-   "chromium::tests/product-variant.spec.ts::Product Variant Registration › [4/9] Variant: 64 ()": [
-    "s",
-    0
-   ],
-   "chromium::tests/product-variant.spec.ts::Product Variant Registration › [5/9] Variant: 65 ()": [
-    "s",
-    0
-   ],
-   "chromium::tests/product-variant.spec.ts::Product Variant Registration › [6/9] Variant: 66 (743)": [
-    "s",
-    0
-   ],
-   "chromium::tests/product-variant.spec.ts::Product Variant Registration › [7/9] Variant: 67 (564)": [
-    "s",
-    0
-   ],
-   "chromium::tests/product-variant.spec.ts::Product Variant Registration › [8/9] Variant: 68 (111)": [
-    "s",
-    0
-   ],
-   "chromium::tests/product-variant.spec.ts::Product Variant Registration › [9/9] Variant: 69 ()": [
-    "s",
-    0
-   ]
-  }
- },
- {
-  "time": 1795073488714,
-  "duration": 147929.95700000002,
-  "passed": 2,
-  "failed": 1,
-  "flaky": 0,
-  "skipped": 7,
-  "total": 10,
-  "tests": {
-   "setup::tests/auth.setup.ts::Global Authentication Setup - Login before all tests": [
-    "p",
-    6190
-   ],
-   "chromium::tests/product-variant.spec.ts::Product Variant Registration › [1/9] Variant: 61 ()": [
-    "s",
-    8
-   ],
-   "chromium::tests/product-variant.spec.ts::Product Variant Registration › [2/9] Variant: 62 ()": [
-    "s",
-    4
-   ],
-   "chromium::tests/product-variant.spec.ts::Product Variant Registration › [3/9] Variant: 63 ()": [
-    "s",
-    3
-   ],
-   "chromium::tests/product-variant.spec.ts::Product Variant Registration › [4/9] Variant: 64 ()": [
-    "s",
-    3
-   ],
-   "chromium::tests/product-variant.spec.ts::Product Variant Registration › [5/9] Variant: 65 ()": [
-    "s",
-    3
-   ],
-   "chromium::tests/product-variant.spec.ts::Product Variant Registration › [6/9] Variant: 66 (743)": [
-    "s",
-    6
-   ],
-   "chromium::tests/product-variant.spec.ts::Product Variant Registration › [7/9] Variant: 67 (564)": [
-    "f",
-    90783
-   ],
-   "chromium::tests/product-variant.spec.ts::Product Variant Registration › [8/9] Variant: 68 (111)": [
-    "p",
-    33266
-   ],
-   "chromium::tests/product-variant.spec.ts::Product Variant Registration › [9/9] Variant: 69 ()": [
-    "s",
-    3
-   ]
-  }
- },
- {
-  "time": 1795075983642,
-  "duration": 141577.42799999999,
-  "passed": 2,
-  "failed": 0,
-  "flaky": 0,
-  "skipped": 8,
-  "total": 10,
-  "tests": {
-   "setup::tests/auth.setup.ts::Global Authentication Setup - Login before all tests": [
-    "p",
-    55394
-   ],
-   "chromium::tests/product-variant.spec.ts::Product Variant Registration › [1/9] Variant: 61 ()": [
-    "s",
-    22
-   ],
-   "chromium::tests/product-variant.spec.ts::Product Variant Registration › [2/9] Variant: 62 ()": [
-    "s",
-    7
-   ],
-   "chromium::tests/product-variant.spec.ts::Product Variant Registration › [3/9] Variant: 63 ()": [
-    "s",
-    2
-   ],
-   "chromium::tests/product-variant.spec.ts::Product Variant Registration › [4/9] Variant: 64 ()": [
-    "s",
-    2
-   ],
-   "chromium::tests/product-variant.spec.ts::Product Variant Registration › [5/9] Variant: 65 ()": [
-    "s",
-    9
-   ],
-   "chromium::tests/product-variant.spec.ts::Product Variant Registration › [6/9] Variant: 66 (743)": [
-    "s",
-    13
-   ],
-   "chromium::tests/product-variant.spec.ts::Product Variant Registration › [7/9] Variant: 67 (564)": [
-    "p",
-    71747
-   ],
-   "chromium::tests/product-variant.spec.ts::Product Variant Registration › [8/9] Variant: 68 (111)": [
-    "s",
-    2
-   ],
-   "chromium::tests/product-variant.spec.ts::Product Variant Registration › [9/9] Variant: 69 ()": [
-    "s",
-    2
-   ]
-  }
- },
- {
-  "time": 1795076711902,
-  "duration": 24234.887,
-  "passed": 1,
-  "failed": 0,
-  "flaky": 0,
-  "skipped": 0,
-  "total": 1,
-  "tests": {
-   "setup::tests/auth.setup.ts::Global Authentication Setup - Login before all tests": [
-    "p",
-    22019
-   ]
-  }
- },
- {
-  "time": 1795076796178,
-  "duration": 8034.070000000001,
-  "passed": 1,
-  "failed": 0,
-  "flaky": 0,
-  "skipped": 0,
-  "total": 1,
-  "tests": {
-   "setup::tests/auth.setup.ts::Global Authentication Setup - Login before all tests": [
-    "p",
-    6104
-   ]
-  }
- },
- {
   "time": 1795077215155,
   "duration": 7461.605,
   "passed": 1,
@@ -750,6 +516,96 @@
    "setup::tests/auth.setup.ts::Global Authentication Setup - Login before all tests": [
     "p",
     5474
+   ]
+  }
+ },
+ {
+  "time": 1795526088128,
+  "duration": 9634.256,
+  "passed": 1,
+  "failed": 0,
+  "flaky": 0,
+  "skipped": 0,
+  "total": 1,
+  "tests": {
+   "setup::tests/auth.setup.ts::Global Authentication Setup - Login before all tests": [
+    "p",
+    6952
+   ]
+  }
+ },
+ {
+  "time": 1795585885829,
+  "duration": 6647.409000000001,
+  "passed": 1,
+  "failed": 0,
+  "flaky": 0,
+  "skipped": 0,
+  "total": 1,
+  "tests": {
+   "setup::tests/auth.setup.ts::Global Authentication Setup - Login before all tests": [
+    "p",
+    4222
+   ]
+  }
+ },
+ {
+  "time": 1795586955058,
+  "duration": 11447.376,
+  "passed": 1,
+  "failed": 0,
+  "flaky": 0,
+  "skipped": 0,
+  "total": 1,
+  "tests": {
+   "setup::tests/auth.setup.ts::Global Authentication Setup - Login before all tests": [
+    "p",
+    7259
+   ]
+  }
+ },
+ {
+  "time": 1795587571875,
+  "duration": 9248.521,
+  "passed": 1,
+  "failed": 0,
+  "flaky": 0,
+  "skipped": 0,
+  "total": 1,
+  "tests": {
+   "setup::tests/auth.setup.ts::Global Authentication Setup - Login before all tests": [
+    "p",
+    6054
+   ]
+  }
+ },
+ {
+  "time": 1795588243772,
+  "duration": 6538.165000000001,
+  "passed": 1,
+  "failed": 0,
+  "flaky": 0,
+  "skipped": 0,
+  "total": 1,
+  "tests": {
+   "setup::tests/auth.setup.ts::Global Authentication Setup - Login before all tests": [
+    "p",
+    4386
+   ]
+  }
+ },
+ {
+  "time": 1795588651167,
+  "duration": 7477.482999999999,
+  "passed": 1,
+  "failed": 0,
+  "flaky": 0,
+  "skipped": 0,
+  "total": 1,
+  "tests": {
+   "setup::tests/auth.setup.ts::Global Authentication Setup - Login before all tests": [
+    "p",
+    5126
    ]
   }
  }

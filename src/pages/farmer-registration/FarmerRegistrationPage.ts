@@ -339,7 +339,7 @@ export class FarmerRegistrationPage extends BasePage {
     // ---------------------------------------------------------
     // Organization (Superadmin only)
     if (!isOrgScoped) {
-      const orgName = farmer.organizationName || process.env.DEFAULT_ORGANIZATION || '';
+      const orgName = farmer.organizationName || '';
       const isOrgVisible = await this.eleUtil.isVisible(this.organizationSelect, 2000);
       if (isOrgVisible && orgName) {
         await this.selectMatOption(this.organizationSelect, orgName);
@@ -353,7 +353,7 @@ export class FarmerRegistrationPage extends BasePage {
 
     // Select Unit Name *
     if (!isUnitScoped) {
-      const unitName = farmer.unitName || process.env.DEFAULT_UNIT || '';
+      const unitName = farmer.unitName || '';
       const isUnitVisible = await this.eleUtil.isVisible(this.unitSelect, 2000);
       if (isUnitVisible && unitName) {
         await this.selectMatOption(this.unitSelect, unitName);

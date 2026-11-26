@@ -70,7 +70,7 @@ function normalizeTransactionRow(row: Record<string, any>, _index: number): Acco
     'Voucher Type',
     'type',
     'Type'
-  ]) || 'Payment';
+  ]);
 
   const unitName = getField([
     'unitName',
@@ -78,7 +78,7 @@ function normalizeTransactionRow(row: Record<string, any>, _index: number): Acco
     'unit',
     'Unit',
     'Select Unit Name'
-  ]) || process.env.DEFAULT_UNIT || '';
+  ]);
 
   const billNo = getField(['billNo', 'Bill No', 'Bill Number', 'billNumber']);
 
@@ -132,7 +132,7 @@ function normalizeTransactionRow(row: Record<string, any>, _index: number): Acco
     'Select Payment Mode',
     'mode',
     'Mode'
-  ]) || 'Bank';
+  ]);
 
   const creditLedger = getField([
     'creditLedger',

@@ -110,8 +110,8 @@ function normalizeSupplierRow(row: Record<string, any>, index: number): Supplier
 
   return {
     // 1. Basic Details
-    organizationName: getField(['Select Organization Name', 'Organization', 'Organization Name', 'organizationId', 'Org Name']) || process.env.DEFAULT_ORGANIZATION || '',
-    unitName: getField(['Select Unit Name', 'Select Unit Name *', 'Unit', 'Unit Name', 'unitId']) || process.env.DEFAULT_UNIT || '',
+    organizationName: getField(['Select Organization Name', 'Organization', 'Organization Name', 'organizationId', 'Org Name']),
+    unitName: getField(['Select Unit Name', 'Select Unit Name *', 'Unit', 'Unit Name', 'unitId']),
     supplierName: resolvedName,
     nameInEnglish: resolvedName,
     regionalName: regionalName || resolvedName,

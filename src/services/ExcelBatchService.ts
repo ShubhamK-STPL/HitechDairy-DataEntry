@@ -72,7 +72,7 @@ export class ExcelBatchService {
   constructor(
     private readonly filePath: string,
     private readonly sheetCandidates: string | string[],
-    private readonly flushInterval: number = 5
+    private readonly flushInterval: number = 3
   ) {
     assertExcelFileWritable(filePath);
     const recoveryDir = path.resolve(process.cwd(), 'reports', 'recovery');

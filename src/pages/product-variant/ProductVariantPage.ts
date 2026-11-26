@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import { GroqIntelligenceService } from '../../services/groqIntelligenceService';
 import { ENV } from '../../config/envConfig';
 import { VariantSequenceAllocator } from '../../utils/variantSequenceAllocator';
+import { resolveProductOrVariantImage, setInputFilesFromPathOrUrl } from '../../utils/imageUploadHelper';
 
 export class ProductVariantPage extends BasePage {
   readonly addVariantButton: Locator;
@@ -166,13 +167,18 @@ export class ProductVariantPage extends BasePage {
    * Selects an option from Angular Material CDK overlay dropdown with search support,
    * resilient fallback matching, and spinner synchronization (Standardized from variants-excel).
    */
-  async selectMatOption(selectLocator: Locator, optionText: string): Promise<this> {
+  async selectMatOption(selectLocator: Locator, optionText: string, exactOnly: boolean = false): Promise<this> {
     if (!optionText) return this;
     const cleanOption = optionText.trim();
 
     await selectLocator.waitFor({ state: 'attached', timeout: 15000 });
     const currentText = (await selectLocator.innerText().catch(() => '')).trim();
-    if (currentText && currentText.toLowerCase().includes(cleanOption.toLowerCase())) {
+    if (
+      currentText &&
+      (exactOnly
+        ? currentText === cleanOption
+        : currentText.toLowerCase().includes(cleanOption.toLowerCase()))
+    ) {
       return this;
     }
 
@@ -202,13 +208,13 @@ export class ProductVariantPage extends BasePage {
       }
     }
 
-    // Select matching option: exact match first, fallback to base name (e.g. without trailing digit)
+    // Select matching option: exact match first, fallback to base name unless exactOnly is true
     let option = panel.getByRole('option', {
       name: cleanOption,
       exact: true
     });
 
-    if (!(await option.isVisible({ timeout: 1500 }).catch(() => false))) {
+    if (!exactOnly && !(await option.isVisible({ timeout: 1500 }).catch(() => false))) {
       const baseName = cleanOption.replace(/\s*\d+$/, '').trim();
       const fallbackOption = panel.locator('mat-option, [role="option"]').filter({
         hasText: new RegExp(this.escapeRegExp(baseName), 'i')
@@ -290,16 +296,7 @@ export class ProductVariantPage extends BasePage {
    * Uploads mandatory variant image
    */
   async uploadImage(imagePath?: string): Promise<this> {
-    const defaultImg = process.env.DEFAULT_PRODUCT_IMAGE_PATH || 'test-data/Upload_08082026235640725.png';
-    const targetPath = imagePath || defaultImg;
-    const resolvedPath = path.isAbsolute(targetPath) ? targetPath : path.resolve(process.cwd(), targetPath);
-
-    if (!fs.existsSync(resolvedPath)) {
-      throw new Error(`Variant image file was not found at: ${resolvedPath}`);
-    }
-
-    await this.fileUploadInput.waitFor({ state: 'attached', timeout: 10000 });
-    await this.fileUploadInput.setInputFiles(resolvedPath);
+    await setInputFilesFromPathOrUrl(this.page, this.fileUploadInput, imagePath, 'Variant');
     await this.waitForSpinnerToHide();
     await this.waitForStep(400);
     return this;
@@ -353,32 +350,15 @@ export class ProductVariantPage extends BasePage {
       await this.selectVariantType(String(record.variantType));
     }
 
-    // 3. Parent Product Name with Marathi/English Fallback
-    if (record.productName) {
-      await this.selectMatOption(this.productIdSelect, record.productName);
-
-      // Check if product was selected; if empty, map English keyword to Marathi options
-      const isSelected = await this.productIdSelect.evaluate((el) => !el.classList.contains('mat-mdc-select-empty')).catch(() => false);
-      if (!isSelected) {
-        if (/cow/i.test(record.productName)) {
-          await this.selectMatOption(this.productIdSelect, 'गाय दूध');
-        } else if (/buffalo/i.test(record.productName)) {
-          await this.selectMatOption(this.productIdSelect, 'म्हैस दूध');
-        } else if (/ghee|tup/i.test(record.productName)) {
-          await this.selectMatOption(this.productIdSelect, 'तूप');
-        } else if (/paneer/i.test(record.productName)) {
-          await this.selectMatOption(this.productIdSelect, 'पनीर');
-        } else if (/curd|dahi/i.test(record.productName)) {
-          await this.selectMatOption(this.productIdSelect, 'दही');
-        } else if (/butter|taak|buttermilk/i.test(record.productName)) {
-          await this.selectMatOption(this.productIdSelect, 'ताक');
-        }
-      }
+    // 3. Parent Product Name (Exact excel value with leading/trailing space trim, no partial matching)
+    if (record.productName && record.productName.trim()) {
+      await this.selectMatOption(this.productIdSelect, record.productName.trim(), true);
     }
 
-    // 4. Variant Name
+    // 4. Variant Name (keep existing value e.g. "Cow Milk - " and append record.variantName)
     if (record.variantName !== undefined && record.variantName !== null && record.variantName !== '') {
-      await this.eleUtil.fill(this.variantNameInput, String(record.variantName));
+      const existingVal = await this.variantNameInput.inputValue().catch(() => '');
+      await this.eleUtil.fill(this.variantNameInput, `${existingVal}${String(record.variantName)}`);
       await this.variantNameInput.blur();
     }
 
@@ -447,8 +427,7 @@ export class ProductVariantPage extends BasePage {
     }
 
     // 7. Mandatory Variant Image
-    const defaultImg = process.env.DEFAULT_PRODUCT_IMAGE_PATH || 'test-data/Upload_08082026235640725.png';
-    const imgPath = record.imagePath || defaultImg;
+    const imgPath = resolveProductOrVariantImage(record.imagePath);
     await this.uploadImage(imgPath);
 
     // 8. Mensuration Type (Volume / Weight / Count) from record
@@ -456,19 +435,9 @@ export class ProductVariantPage extends BasePage {
       await this.selectMatOption(this.mensurationTypeSelect, record.mensurationType);
     }
 
-    // 9. Mensuration Unit (ml -> Milliliter, L -> Liter, kg -> Kilogram, g -> Gram) from record
-    if (record.mensurationUnit) {
-      let mensurationUnit = record.mensurationUnit;
-      if (/^ml$/i.test(mensurationUnit) || /milli/i.test(mensurationUnit)) {
-        mensurationUnit = 'Milliliter';
-      } else if (/^l$/i.test(mensurationUnit) || /litre|liter/i.test(mensurationUnit)) {
-        mensurationUnit = 'Liter';
-      } else if (/^kg$/i.test(mensurationUnit) || /kilo/i.test(mensurationUnit)) {
-        mensurationUnit = 'Kilogram';
-      } else if (/^g$/i.test(mensurationUnit) || /gram/i.test(mensurationUnit)) {
-        mensurationUnit = 'Gram';
-      }
-      await this.selectMatOption(this.mensurationUnitSelect, mensurationUnit);
+    // 9. Mensuration Unit (Exact excel value with leading/trailing space trim, no partial matching)
+    if (record.mensurationUnit && record.mensurationUnit.trim()) {
+      await this.selectMatOption(this.mensurationUnitSelect, record.mensurationUnit.trim(), true);
     }
 
     // 10. Applicable Taxes (e.g. GST 5%, GST 0%, Exempted) from record
@@ -493,11 +462,9 @@ export class ProductVariantPage extends BasePage {
       await this.salePriceInput.blur();
     }
 
-    // 13. E-Commerce Visibility Checkbox (from record, default true)
-    const isEComVisible = record.eCommerceVisibility !== false &&
-      record.eCommerceVisibility !== 'false' &&
-      record.eCommerceVisibility !== 'No' &&
-      record.eCommerceVisibility !== 'no';
+    // 13. E-Commerce Visibility Checkbox (default false / 'No' when empty)
+    const eComRaw = String(record.eCommerceVisibility ?? '').trim().toLowerCase();
+    const isEComVisible = eComRaw === 'true' || eComRaw === 'yes' || eComRaw === '1';
     await this.setCheckbox(this.eCommerceVisibilityCheckbox, isEComVisible);
 
     // 14. Optional Product Description
@@ -621,9 +588,13 @@ export class ProductVariantPage extends BasePage {
       this.eleUtil.click(this.submitButton, 5000, true)
     ]);
 
-    // Check if clicking submit surfaced Angular "Variant Code already exists"
-    await this.waitForStep(400);
-    const dialogTextAfterSubmit = await this.dialogContainer.innerText().catch(() => '');
+    // Check if clicking submit surfaced Angular "Variant Code already exists" (only if response was not 200/201 and dialog is still visible)
+    const gotSuccessResponse = Boolean(response && [200, 201].includes(response.status()));
+    let dialogTextAfterSubmit = '';
+    if (!gotSuccessResponse && await this.dialogContainer.isVisible().catch(() => false)) {
+      await this.waitForStep(300);
+      dialogTextAfterSubmit = await this.dialogContainer.innerText({ timeout: 1000 }).catch(() => '');
+    }
     if (/already exists/i.test(dialogTextAfterSubmit)) {
       const currentVal = await this.variantCodeInput.inputValue().catch(() => '');
       const baseNum = Number(currentVal.replace(/\D/g, '')) || 500;
@@ -677,20 +648,21 @@ export class ProductVariantPage extends BasePage {
         : Boolean(response && [200, 201].includes(response.status()))
     );
 
-    // 4. Capture screenshot (SS) of the feedback toast & modal state
+    // 4. Capture screenshot (SS) only on failure/rejection
     let screenshotPath: string | undefined;
     let aiAnalysis: string | undefined;
 
-    try {
-      const screenshotsDir = path.resolve(process.cwd(), 'test-results', 'submissions');
-      fs.mkdirSync(screenshotsDir, { recursive: true });
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const prefix = success ? 'success' : 'failure';
-      screenshotPath = path.join(screenshotsDir, `${prefix}_toast_${timestamp}.png`);
-      await this.page.screenshot({ path: screenshotPath, fullPage: true });
-      console.log(`📸 [Screenshot Captured]: ${screenshotPath}`);
-    } catch (ssErr: any) {
-      console.warn(`[Screenshot Warning] Could not capture screenshot: ${ssErr.message}`);
+    if (!success) {
+      try {
+        const screenshotsDir = path.resolve(process.cwd(), 'test-results', 'submissions');
+        fs.mkdirSync(screenshotsDir, { recursive: true });
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        screenshotPath = path.join(screenshotsDir, `failure_toast_${timestamp}.png`);
+        await this.page.screenshot({ path: screenshotPath, fullPage: true });
+        console.log(`📸 [Screenshot Captured]: ${screenshotPath}`);
+      } catch (ssErr: any) {
+        console.warn(`[Screenshot Warning] Could not capture screenshot: ${ssErr.message}`);
+      }
     }
 
     // 5. If submission failed or returned error toast, analyze using AI
@@ -733,6 +705,9 @@ Analyze why this submission failed and provide the exact 1-2 sentence solution t
    * Verifies that the product variant exists in the ERP listing or confirmed server response.
    */
   async verifyVariant(variantCodeOrName: string): Promise<{ found: boolean; id: string }> {
+    if (this.lastSavedRecordId) {
+      return { found: true, id: this.lastSavedRecordId };
+    }
     return await this.verifyRecordInListing(variantCodeOrName, ENV.PRODUCT_VARIANT_URL, this.lastSavedRecordId);
   }
 }

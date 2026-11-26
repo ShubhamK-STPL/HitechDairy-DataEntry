@@ -5,6 +5,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { GroqIntelligenceService } from '../../services/groqIntelligenceService';
 import { ENV } from '../../config/envConfig';
+import { resolveProductOrVariantImage, setInputFilesFromPathOrUrl } from '../../utils/imageUploadHelper';
 
 export class ProductRegistrationPage extends BasePage {
   readonly cardContainer: Locator;
@@ -221,14 +222,7 @@ export class ProductRegistrationPage extends BasePage {
    * Uploads mandatory product image
    */
   async uploadImage(imagePath?: string): Promise<this> {
-    const defaultImg = process.env.DEFAULT_PRODUCT_IMAGE_PATH || 'test-data/Upload_08082026235640725.png';
-    const targetPath = imagePath || defaultImg;
-    const resolvedPath = path.isAbsolute(targetPath) ? targetPath : path.resolve(process.cwd(), targetPath);
-    if (!fs.existsSync(resolvedPath)) {
-      throw new Error(`Product image is mandatory, but image file was not found at: ${resolvedPath}`);
-    }
-    await this.fileUploadInput.waitFor({ state: 'attached', timeout: 10000 });
-    await this.fileUploadInput.setInputFiles(resolvedPath);
+    await setInputFilesFromPathOrUrl(this.page, this.fileUploadInput, imagePath, 'Product');
     await this.waitForStep(600);
     return this;
   }
@@ -243,7 +237,7 @@ export class ProductRegistrationPage extends BasePage {
     if (!isOrgScoped) {
       const isOrgVisible = await this.eleUtil.isVisible(this.organizationSelect, 2000);
       if (isOrgVisible) {
-        const orgToSelect = record.organizationName || process.env.DEFAULT_ORGANIZATION || '';
+        const orgToSelect = record.organizationName || '';
         if (orgToSelect) {
           await this.selectOrganization(orgToSelect);
           await this.waitForStep(500);
@@ -284,8 +278,7 @@ export class ProductRegistrationPage extends BasePage {
     }
 
     // 7. Mandatory Product Image Upload
-    const defaultImg = process.env.DEFAULT_PRODUCT_IMAGE_PATH || 'test-data/Upload_08082026235640725.png';
-    const imgPath = record.imagePath || defaultImg;
+    const imgPath = resolveProductOrVariantImage(record.imagePath);
     await this.uploadImage(imgPath);
   }
 

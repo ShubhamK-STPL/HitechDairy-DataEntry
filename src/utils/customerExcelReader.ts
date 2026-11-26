@@ -6,6 +6,7 @@ const CUSTOMER_KNOWN_HEADERS = [
   'Name In English',
   'Name In Regional Language',
   'Select Category',
+  'Customer Code',
   'Contact Number',
   'Bill Type',
   'Price Group',
@@ -47,7 +48,7 @@ function normalizeCustomerRow(row: Record<string, any>, _index: number): Custome
     'Unit Name',
     'Unit',
     'unitId'
-  ]) || process.env.DEFAULT_UNIT || '';
+  ]);
 
   const nameInEnglish = getField([
     'Name In English',
@@ -84,6 +85,11 @@ function normalizeCustomerRow(row: Record<string, any>, _index: number): Custome
     'Category',
     'categoryId'
   ]) || 'Individual';
+
+  const customerCode = getField([
+    'Customer Code',
+    'customerCode'
+  ]);
 
   const emailId = getField(['Email ID', 'Email', 'emailId']);
 
@@ -148,13 +154,14 @@ function normalizeCustomerRow(row: Record<string, any>, _index: number): Custome
 
   return {
     // 1. Basic Details
-    organizationName: getField(['Select Organization Name', 'Organization', 'orgName']) || process.env.DEFAULT_ORGANIZATION || '',
+    organizationName: getField(['Select Organization Name', 'Organization', 'orgName']),
     unitName,
     nameInEnglish,
     customerName: nameInEnglish,
     nameInRegional,
     regionalName: nameInRegional,
     category,
+    customerCode,
     contactNumber,
     mobileNo: contactNumber,
     emailId,

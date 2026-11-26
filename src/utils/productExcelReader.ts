@@ -1,5 +1,6 @@
 import type { ProductRecord } from '../pages/product-registration/ProductTypes';
 import { readSheetRows } from './excelSheetHelper';
+import { getDefaultLogoUrl } from './imageUploadHelper';
 
 const PRODUCT_KNOWN_HEADERS = [
   'Select Organization Name',
@@ -57,15 +58,13 @@ function normalizeProductRow(row: Record<string, any>, index: number): ProductRe
     'organizationName',
     'Org Name',
     'Org'
-  ]) || process.env.DEFAULT_ORGANIZATION || '';
+  ]);
 
   const productName = getField([
     'Product Name',
     'productName',
-    'Name',
     'Item Name',
-    'Product',
-    'Title'
+    'Product'
   ]);
 
   const productCategory = getField([
@@ -77,17 +76,14 @@ function normalizeProductRow(row: Record<string, any>, index: number): ProductRe
 
   const productType = getField([
     'Product Type',
-    'productType',
-    'Type'
+    'productType'
   ]);
 
   const hsnSacCode = getField([
     'HSN/SAC Code',
     'HSN/SAC',
     'HSN Code',
-    'hsnSacCode',
-    'HSN',
-    'SAC'
+    'hsnSacCode'
   ]);
 
   const canBeSold = getBoolField([
@@ -108,21 +104,15 @@ function normalizeProductRow(row: Record<string, any>, index: number): ProductRe
 
   const trackingMethod = getField([
     'Tracking Method',
-    'trackingMethod',
-    'Tracking',
-    'Method'
+    'trackingMethod'
   ]);
 
-  const defaultImg = process.env.DEFAULT_PRODUCT_IMAGE_PATH || 'test-data/Upload_08082026235640725.png';
   const imagePath = getField([
     'Image Path',
     'Image',
     'imagePath',
-    'Photo',
-    'Picture',
-    'File',
     'Product Image'
-  ]) || defaultImg;
+  ]) || getDefaultLogoUrl();
 
   return {
     organizationName,

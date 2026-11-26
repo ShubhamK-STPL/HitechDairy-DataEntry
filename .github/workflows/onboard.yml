@@ -11,7 +11,6 @@ on:
         options:
           - Products
           - Variants
-          - VariantsV2
           - Customers
           - Suppliers
           - Farmers
@@ -76,6 +75,10 @@ on:
         description: 'Batch limit (0 for all records)'
         required: false
         default: '0'
+      financial_year_response:
+        description: 'Optional mock JSON response for GetFinancialYear'
+        required: false
+        default: ''
       excel_file_path:
         description: 'Path to Excel workbook'
         required: true
@@ -125,6 +128,7 @@ jobs:
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           USE_AI_INTELLIGENCE: ${{ github.event.inputs.use_ai }}
+          GET_FINANCIAL_YEAR_RESPONSE: ${{ github.event.inputs.financial_year_response }}
           HEADLESS: 'true'
           EXCEL_PATH: ${{ github.event.inputs.excel_file_path }}
           FORCE_COLOR: '1'

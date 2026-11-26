@@ -34,7 +34,7 @@ const VALID_MODULES: OnboardingModuleName[] = ['Products', 'Variants', 'Variants
 function parseModuleArg(raw?: string): OnboardingModuleName {
   if (!raw) return 'Products';
   const clean = raw.trim().toLowerCase().replace(/[-_\s]+/g, '');
-  if (['variantsv2', 'variantv2', 'productvariantv2', 'productvariantsv2', 'v2'].includes(clean)) {
+  if (['variants', 'variant', 'productvariant', 'productvariants', 'variantsv2', 'variantv2', 'productvariantv2', 'productvariantsv2', 'v2'].includes(clean)) {
     return 'VariantsV2';
   }
   if (['salesinvoice', 'salesinvoices', 'invoice', 'invoices', 'saleinvoice'].includes(clean)) {
@@ -94,8 +94,8 @@ export function getExecutionSettings(argv: string[] = process.argv.slice(2)): Ex
       ? true
       : process.env.HEADLESS !== 'false';
 
-  const rawFlush = Number(process.env.EXCEL_FLUSH_BATCH_SIZE || 5);
-  const flushInterval = Math.max(1, Number.isFinite(rawFlush) ? Math.floor(rawFlush) : 5);
+  const rawFlush = Number(process.env.EXCEL_FLUSH_BATCH_SIZE || 1);
+  const flushInterval = Math.max(1, Number.isFinite(rawFlush) ? Math.floor(rawFlush) : 1);
 
   const rawLimit = getCliValue(argv, 'limit');
   const parsedLimit = rawLimit ? Number(rawLimit) : undefined;

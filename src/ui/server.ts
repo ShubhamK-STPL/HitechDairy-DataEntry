@@ -20,7 +20,7 @@ const RESULTS_DIR = path.resolve(WORKSPACE_ROOT, 'test-results');
 const RUNNER_HTML_PATH = path.resolve(__dirname, 'runner.html');
 const PORT = Number(process.env.UI_PORT || 4173);
 
-const MODULES: OnboardingModuleName[] = ['Products', 'Variants', 'VariantsV2', 'Customers', 'Suppliers', 'Farmers', 'SalesInvoices', 'AccountTransactions'];
+const MODULES: OnboardingModuleName[] = ['Products', 'Variants', 'Customers', 'Suppliers', 'Farmers', 'SalesInvoices', 'AccountTransactions'];
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 const MAX_LOG_LINES = 500;
 
@@ -321,22 +321,28 @@ function startOnboardingRun(params: RunParams): void {
     throw new Error(`Selected Excel file not found in test-data/: ${params.excelFile}`);
   }
 
-  if (!MODULES.includes(params.module)) {
+  const requestedModule: OnboardingModuleName = params.module === 'VariantsV2' ? 'Variants' : params.module;
+  if (!MODULES.includes(requestedModule)) {
     throw new Error(`Invalid module: ${params.module}`);
   }
+  const effectiveParams: RunParams = {
+    ...params,
+    module: requestedModule,
+    allowDummyMobile: Boolean(params.allowDummyMobile && ['Farmers', 'Customers', 'Suppliers'].includes(requestedModule))
+  };
 
-  const selectedEnv = resolveEnvironmentPreset(params.env);
+  const selectedEnv = resolveEnvironmentPreset(effectiveParams.env);
 
-  const customUsername = String(params.username || '').trim();
-  const customPassword = String(params.password || '');
+  const customUsername = String(effectiveParams.username || '').trim();
+  const customPassword = String(effectiveParams.password || '');
 
-  if (!params.reportOnly) {
+  if (!effectiveParams.reportOnly) {
     assertExcelFileWritable(absExcelPath);
 
     const inspection = inspectWorkbook(absExcelPath);
-    const modInfo = inspection.modules.find((m) => m.module === params.module);
+    const modInfo = inspection.modules.find((m) => m.module === effectiveParams.module);
     if (!modInfo?.available || modInfo.total === 0) {
-      throw new Error(`Selected workbook does not contain valid records for module "${params.module}".`);
+      throw new Error(`Selected workbook does not contain valid records for module "${effectiveParams.module}".`);
     }
 
     if (!customUsername) {
@@ -347,12 +353,12 @@ function startOnboardingRun(params: RunParams): void {
       throw new Error('ERP Password is required before running execution.');
     }
 
-    if (params.parallel && (!Number.isFinite(params.workers) || params.workers < 1 || params.workers > 8)) {
+    if (effectiveParams.parallel && (!Number.isFinite(effectiveParams.workers) || effectiveParams.workers < 1 || effectiveParams.workers > 8)) {
       throw new Error('Worker count must be between 1 and 8 for parallel execution.');
     }
 
     // Compulsory pre-validation check for Farmers module
-    if (params.module === 'Farmers') {
+    if (effectiveParams.module === 'Farmers') {
       try {
         const verifyResult = runFarmerVerification(absExcelPath);
         if (verifyResult.duplicateMobiles.length > 0) {
@@ -375,20 +381,20 @@ function startOnboardingRun(params: RunParams): void {
 
   const scriptArgs = [
     'src/onboarding.ts',
-    `--module=${params.module}`,
-    params.parallel ? '--parallel' : '--sequential',
-    ...(params.parallel ? [`--workers=${Math.max(1, Math.min(8, Math.floor(params.workers || 2)))}`] : []),
-    params.headless ? '--headless' : '--headed',
-    ...(params.retryFailed ? ['--retry-failed'] : []),
-    ...(params.useAiIntelligence !== false ? ['--use-ai'] : ['--no-ai']),
-    ...(params.allowDummyMobile ? ['--dummy-mobile'] : []),
-    ...(params.allowDummyMobile && params.startMobile ? [`--start-mobile=${params.startMobile}`] : []),
-    ...(params.limit && params.limit > 0 ? [`--limit=${Math.floor(params.limit)}`] : []),
-    ...(params.reportOnly ? ['--report-only'] : [])
+    `--module=${effectiveParams.module}`,
+    effectiveParams.parallel ? '--parallel' : '--sequential',
+    ...(effectiveParams.parallel ? [`--workers=${Math.max(1, Math.min(8, Math.floor(effectiveParams.workers || 2)))}`] : []),
+    effectiveParams.headless ? '--headless' : '--headed',
+    ...(effectiveParams.retryFailed ? ['--retry-failed'] : []),
+    ...(effectiveParams.useAiIntelligence !== false ? ['--use-ai'] : ['--no-ai']),
+    ...(effectiveParams.allowDummyMobile ? ['--dummy-mobile'] : []),
+    ...(effectiveParams.allowDummyMobile && effectiveParams.startMobile ? [`--start-mobile=${effectiveParams.startMobile}`] : []),
+    ...(effectiveParams.limit && effectiveParams.limit > 0 ? [`--limit=${Math.floor(effectiveParams.limit)}`] : []),
+    ...(effectiveParams.reportOnly ? ['--report-only'] : [])
   ];
 
   const sanitizedParams: RunParams = {
-    ...params,
+    ...effectiveParams,
     username: customUsername || undefined,
     password: undefined
   };
@@ -434,8 +440,8 @@ function startOnboardingRun(params: RunParams): void {
         ...(customPassword ? { ADMIN_PASSWORD: customPassword } : {}),
         EXCEL_PATH: absExcelPath,
         USE_AI_INTELLIGENCE: params.useAiIntelligence !== false ? 'true' : 'false',
-        ALLOW_DUMMY_MOBILE: params.allowDummyMobile ? 'true' : 'false',
-        ...(params.allowDummyMobile && params.startMobile ? { START_DUMMY_MOBILE: params.startMobile } : {}),
+        ALLOW_DUMMY_MOBILE: effectiveParams.allowDummyMobile ? 'true' : 'false',
+        ...(effectiveParams.allowDummyMobile && effectiveParams.startMobile ? { START_DUMMY_MOBILE: effectiveParams.startMobile } : {}),
         ...(params.financialYearResponse ? { GET_FINANCIAL_YEAR_RESPONSE: params.financialYearResponse.trim() } : {}),
         OPEN_HTML_REPORT: 'false',
         FORCE_COLOR: '0'

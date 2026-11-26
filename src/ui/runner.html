@@ -588,10 +588,6 @@
             <div class="module-name">Variants</div>
             <div class="module-meta">Ready</div>
           </button>
-          <button type="button" class="module-btn" data-module="VariantsV2">
-            <div class="module-name">Variants (V2)</div>
-            <div class="module-meta">Ready</div>
-          </button>
           <button type="button" class="module-btn" data-module="Customers">
             <div class="module-name">Customers</div>
             <div class="module-meta">Ready</div>
@@ -661,7 +657,7 @@
               <label><input type="checkbox" id="retry-failed" /> Retry Failed</label>
               <label><input type="checkbox" id="headed-mode" /> Show Browser</label>
               <label title="Enable Groq AI Autonomous diagnostics and self-healing for test failures"><input type="checkbox" id="ai-intelligence" checked /> AI Intelligence</label>
-              <label title="Auto-generate or increment dummy mobile numbers for customer/supplier/farmer onboarding"><input type="checkbox" id="dummy-mobile" /> Allow Dummy Mobile</label>
+              <label id="dummy-mobile-label" style="display:none;" title="Auto-generate or increment dummy mobile numbers for customer/supplier/farmer onboarding"><input type="checkbox" id="dummy-mobile" /> Allow Dummy Mobile</label>
             </div>
           </div>
         </div>
@@ -745,6 +741,7 @@
         <div style="background:var(--border); border-radius:999px; height:8px; overflow:hidden;">
           <div id="live-progress-bar" style="background:linear-gradient(90deg, var(--primary), #3b82f6); height:100%; width:0%; transition:width 0.25s ease;"></div>
         </div>
+        <div id="worker-progress-list" style="margin-top:0.65rem; display:grid; gap:0.45rem;"></div>
       </div>
 
       <!-- View Switcher Tabs -->
@@ -786,6 +783,7 @@
     const headedEl = document.getElementById('headed-mode');
     const aiIntelligenceEl = document.getElementById('ai-intelligence');
     const dummyMobileEl = document.getElementById('dummy-mobile');
+    const dummyMobileLabelEl = document.getElementById('dummy-mobile-label');
     const dummyMobileConfigEl = document.getElementById('dummy-mobile-config');
     const startMobileInput = document.getElementById('start-mobile-input');
     const fyearResponseInput = document.getElementById('fyear-response-input');
@@ -799,6 +797,7 @@
     const liveProgressBar = document.getElementById('live-progress-bar');
     const liveProgressPercent = document.getElementById('live-progress-percent');
     const liveProgressLabel = document.getElementById('live-progress-label');
+    const workerProgressList = document.getElementById('worker-progress-list');
     const liveWorkerBadge = document.getElementById('live-worker-badge');
     const tabJsonBtn = document.getElementById('tab-json-btn');
     const tabRawBtn = document.getElementById('tab-raw-btn');
@@ -816,9 +815,25 @@
     let envPresets = [];
     let historyList = [];
 
+    const DUMMY_MOBILE_MODULES = new Set(['Farmers', 'Customers', 'Suppliers']);
+
+    function updateDummyMobileVisibility() {
+      const allowed = DUMMY_MOBILE_MODULES.has(selectedModule);
+      if (dummyMobileLabelEl) {
+        dummyMobileLabelEl.style.display = allowed ? 'inline-flex' : 'none';
+      }
+      if (!allowed) {
+        dummyMobileEl.checked = false;
+        dummyMobileConfigEl.style.display = 'none';
+      } else {
+        dummyMobileConfigEl.style.display = dummyMobileEl.checked ? 'block' : 'none';
+      }
+    }
+
     dummyMobileEl.addEventListener('change', () => {
-      dummyMobileConfigEl.style.display = dummyMobileEl.checked ? 'block' : 'none';
+      updateDummyMobileVisibility();
     });
+    updateDummyMobileVisibility();
 
     function formatIst12Hr(val) {
       if (!val) return '';
@@ -874,6 +889,7 @@
       const match = envPresets.find(e => e.key === envSelect.value);
       portalUrlEl.textContent = match ? match.baseUrl : '(configured in .env)';
       prodWarningEl.style.display = envSelect.value === 'prod' ? 'block' : 'none';
+      updateDummyMobileVisibility();
       updateButtons();
     }
 
@@ -944,6 +960,7 @@
       } else {
         statusText.textContent = 'Idle';
       }
+      updateDummyMobileVisibility();
       updateButtons();
     }
 
@@ -976,38 +993,124 @@
       consoleLogEl.scrollTop = consoleLogEl.scrollHeight;
     }
 
+    function escapeHtml(str) {
+      return String(str ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    const workerProgressMap = new Map();
+
     function onExecutionJsonReceived(data) {
       if (!data) return;
+
+      const wid = data.workerId || 'W1';
+      const progressMatch = String(data.progress || '').match(/(\d+)\s*\/\s*(\d+)/);
+      const parsedCurrent = progressMatch ? Number(progressMatch[1]) : 0;
+      const parsedTotal = progressMatch ? Number(progressMatch[2]) : 0;
+
+      const wTotal = Number(data.kpis?.total ?? parsedTotal) || 0;
+      const wPassed = Number(data.kpis?.passed) || 0;
+      const wFailed = Number(data.kpis?.failed) || 0;
+      const wSkipped = Number(data.kpis?.skipped) || 0;
+      const wCompleted = wPassed + wFailed + wSkipped;
+      const wCurrent = Math.max(parsedCurrent, wCompleted);
+      const wPercent = wTotal > 0
+        ? Math.min(100, Number((((wCompleted > 0 ? wCompleted : wCurrent) / wTotal) * 100).toFixed(1)))
+        : (data.percent || 0);
+
+      workerProgressMap.set(wid, {
+        total: wTotal,
+        passed: wPassed,
+        failed: wFailed,
+        skipped: wSkipped,
+        current: wCurrent,
+        percent: wPercent,
+        rowIndex: data.rowIndex,
+        label: data.label,
+        status: data.status
+      });
+
+      let aggTotal = 0;
+      let aggPassed = 0;
+      let aggFailed = 0;
+      let aggSkipped = 0;
+      let aggCurrent = 0;
+      for (const w of workerProgressMap.values()) {
+        aggTotal += w.total;
+        aggPassed += w.passed;
+        aggFailed += w.failed;
+        aggSkipped += w.skipped;
+        aggCurrent += w.current;
+      }
+
+      const aggCompleted = aggPassed + aggFailed + aggSkipped;
+      const aggPercent = aggTotal > 0
+        ? Number((((aggCompleted > 0 ? aggCompleted : aggCurrent) / aggTotal) * 100).toFixed(1))
+        : (data.percent || 0);
+
       if (liveProgressContainer) {
         liveProgressContainer.style.display = 'block';
       }
       if (liveProgressBar) {
-        liveProgressBar.style.width = `${data.percent || 0}%`;
+        liveProgressBar.style.width = `${Math.min(100, aggPercent)}%`;
       }
       if (liveProgressPercent) {
-        liveProgressPercent.textContent = `${data.percent || 0}%`;
+        liveProgressPercent.textContent = `${Math.min(100, aggPercent)}%`;
       }
       if (liveProgressLabel) {
-        liveProgressLabel.textContent = `Row ${data.rowIndex}: ${data.label} [${data.status}] (${data.progress})`;
+        const displayCount = aggTotal > 0 ? `${aggCurrent} / ${aggTotal}` : data.progress;
+        liveProgressLabel.textContent = `[${wid}] Row ${data.rowIndex}: ${data.label} [${data.status}] (${displayCount})`;
       }
       if (liveWorkerBadge) {
-        liveWorkerBadge.textContent = `[${data.workerId || 'Worker'}] Row ${data.rowIndex}`;
+        liveWorkerBadge.textContent = `${workerProgressMap.size} Worker(s) · [${wid}] Row ${data.rowIndex}`;
+      }
+
+      if (workerProgressList) {
+        const sortedWorkers = Array.from(workerProgressMap.entries()).sort((a, b) =>
+          a[0].localeCompare(b[0], undefined, { numeric: true })
+        );
+        workerProgressList.innerHTML = sortedWorkers.map(([workerId, w]) => {
+          const barColor = w.failed > 0 ? '#f59e0b' : 'var(--primary)';
+          const statusColor = w.status === 'FAILED' ? 'var(--danger)' : w.status === 'IN_PROGRESS' ? '#3b82f6' : 'var(--primary)';
+          return `
+            <div style="padding:0.4rem 0.55rem; background:var(--surface); border:1px solid var(--border); border-radius:6px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.74rem; margin-bottom:0.25rem; gap:0.5rem;">
+                <span style="font-weight:700; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                  <span style="font-family:var(--font-mono); color:var(--primary);">[${escapeHtml(workerId)}]</span>
+                  Row ${escapeHtml(String(w.rowIndex ?? '-'))}: ${escapeHtml(String(w.label || ''))}
+                  <span style="color:${statusColor}; font-weight:700;">[${escapeHtml(String(w.status || ''))}]</span>
+                </span>
+                <span style="font-family:var(--font-mono); font-weight:700; color:var(--text-secondary); white-space:nowrap;">
+                  ${w.current}/${w.total} (${w.percent}%) · ✓${w.passed} ✕${w.failed}
+                </span>
+              </div>
+              <div style="background:var(--border); border-radius:999px; height:5px; overflow:hidden;">
+                <div style="background:${barColor}; height:100%; width:${w.percent}%; transition:width 0.25s ease;"></div>
+              </div>
+            </div>
+          `;
+        }).join('');
       }
 
       if (data.kpis) {
-        document.getElementById('kpi-total').textContent = String(data.kpis.total || 0);
-        document.getElementById('kpi-success').textContent = String(data.kpis.passed || 0);
-        document.getElementById('kpi-failed').textContent = String(data.kpis.failed || 0);
-        document.getElementById('kpi-skipped').textContent = String(data.kpis.skipped || 0);
+        document.getElementById('kpi-total').textContent = String(aggTotal);
+        document.getElementById('kpi-success').textContent = String(aggPassed);
+        document.getElementById('kpi-failed').textContent = String(aggFailed);
+        document.getElementById('kpi-skipped').textContent = String(aggSkipped);
       }
 
       const displayItem = {
+        worker: wid,
         row: data.rowIndex,
         status: data.status,
         name: data.label,
         ...(data.erpRecordId ? { erpRecordId: data.erpRecordId } : {}),
         ...(data.duration !== undefined ? { duration: `${data.duration}s` } : {}),
-        progress: `${data.progress} (${data.percent}%)`,
+        progress: aggTotal > 0 ? `${aggCurrent} / ${aggTotal} (${aggPercent}%)` : `${data.progress} (${data.percent}%)`,
         time: data.timestamp || formatIstTimeOnly12Hr(),
         ...(data.message ? { message: data.message } : {})
       };
@@ -1023,6 +1126,7 @@
     }
 
     function clearExecutionDetails(metaMsg = 'Fresh execution in progress...') {
+      workerProgressMap.clear();
       document.getElementById('kpi-total').textContent = '0';
       document.getElementById('kpi-success').textContent = '0';
       document.getElementById('kpi-failed').textContent = '0';
@@ -1039,6 +1143,9 @@
         liveProgressBar.style.width = '0%';
         liveProgressPercent.textContent = '0%';
         liveProgressLabel.textContent = 'Initializing execution run...';
+      }
+      if (workerProgressList) {
+        workerProgressList.innerHTML = '';
       }
       if (historyRunSelect) {
         historyRunSelect.value = 'latest';
@@ -1184,8 +1291,6 @@
           ? 'Sales Invoices'
           : m.module === 'AccountTransactions'
           ? 'Account Transactions'
-          : m.module === 'VariantsV2'
-          ? 'Variants (V2)'
           : m.module.replace(/([a-z])([A-Z])/g, '$1 $2');
         return `
           <button type="button"
@@ -1204,6 +1309,7 @@
         });
       });
 
+      updateDummyMobileVisibility();
       updateButtons();
     }
 
