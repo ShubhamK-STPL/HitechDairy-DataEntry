@@ -1,0 +1,101 @@
+name: CI/CD — Verify & Deploy to Self-Hosted Server
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-main
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    name: 🧪 CI (Typecheck & Frontend Syntax)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: 📦 Install Dependencies
+        run: npm install
+
+      - name: 🔍 TypeScript Typecheck
+        run: npm run typecheck
+
+      - name: 🌐 Verify Runner HTML Script Syntax
+        run: |
+          node -e '
+            const fs = require("fs");
+            for (const file of ["src/ui/runner.html", "public/index.html"]) {
+              const html = fs.readFileSync(file, "utf8");
+              const m = html.match(/<script>([\s\S]*?)<\/script>/);
+              if (!m) throw new Error("Missing <script> block in " + file);
+              new Function(m[1]);
+              console.log("JS syntax OK:", file);
+            }
+          '
+
+  deploy:
+    name: 🚀 Deploy to Self-Hosted Server
+    needs: ci
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 🔐 Deploy via SSH & Restart Service
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: ${{ secrets.SERVER_PORT || 22 }}
+          script: |
+            set -e
+            APP_DIR="${{ secrets.SERVER_DEPLOY_PATH || '/opt/hitechdairy-onboarding' }}"
+            SERVICE_NAME="${{ secrets.SERVER_SERVICE_NAME || 'hitechdairy-ui' }}"
+
+            echo "📂 Deploying in $APP_DIR ..."
+            cd "$APP_DIR"
+
+            # Wait briefly if an active onboarding run is in progress
+            if pgrep -f "src/onboarding.ts" >/dev/null 2>&1; then
+              echo "⏳ Active onboarding run detected. Waiting up to 60s before restarting..."
+              for i in $(seq 1 12); do
+                pgrep -f "src/onboarding.ts" >/dev/null 2>&1 || break
+                sleep 5
+              done
+            fi
+
+            # Preserve any server-side Excel edits in test-data/ across pull
+            STASHED=0
+            if [ -n "$(git status --porcelain test-data/)" ]; then
+              git stash push -m "ci-deploy-preserve-testdata" -- test-data/
+              STASHED=1
+            fi
+
+            git fetch origin main
+            git pull --ff-only origin main
+
+            if [ "$STASHED" -eq 1 ]; then
+              git stash pop || echo "⚠️ Check git stash list if test-data had a merge conflict"
+            fi
+
+            echo "📦 Installing dependencies & ensuring Chromium..."
+            npm install
+            npx playwright install chromium
+
+            echo "🔄 Restarting systemd service: $SERVICE_NAME"
+            sudo systemctl restart "$SERVICE_NAME"
+
+            echo "🩺 Verifying server health..."
+            sleep 2
+            curl -sf http://127.0.0.1:4173/api/files >/dev/null
+            echo "✅ Deployment successful!"
