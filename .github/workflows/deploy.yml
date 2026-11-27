@@ -31,18 +31,8 @@ jobs:
       - name: 🔍 TypeScript Typecheck
         run: npm run typecheck
 
-      - name: 🌐 Verify Runner HTML Script Syntax
-        run: |
-          node -e '
-            const fs = require("fs");
-            for (const file of ["src/ui/runner.html", "public/index.html"]) {
-              const html = fs.readFileSync(file, "utf8");
-              const m = html.match(/<script>([\s\S]*?)<\/script>/);
-              if (!m) throw new Error("Missing <script> block in " + file);
-              new Function(m[1]);
-              console.log("JS syntax OK:", file);
-            }
-          '
+      - name: 🌐 Verify Runner JS Syntax
+        run: node --check src/ui/runner.js
 
   deploy:
     name: 🚀 Deploy to Self-Hosted Server
@@ -83,6 +73,12 @@ jobs:
 
             git fetch origin main
             git pull --ff-only origin main
+
+            # Seed templates into runtime test-data/ without overwriting existing server files
+            mkdir -p test-data
+            if [ -d templates ]; then
+              cp -n templates/*.xlsx test-data/ 2>/dev/null || true
+            fi
 
             if [ "$STASHED" -eq 1 ]; then
               git stash pop || echo "⚠️ Check git stash list if test-data had a merge conflict"

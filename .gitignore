@@ -12,6 +12,8 @@ Universal_AI_Agent/
 debug.log
 variant-error-row-4.png
 eng.traineddata
+test-data/*.xlsx
+test-data/uploads/
 test-data/trash/
 *.lock
 *.md

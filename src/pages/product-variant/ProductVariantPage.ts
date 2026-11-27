@@ -167,7 +167,7 @@ export class ProductVariantPage extends BasePage {
    * Selects an option from Angular Material CDK overlay dropdown with search support,
    * resilient fallback matching, and spinner synchronization (Standardized from variants-excel).
    */
-  async selectMatOption(selectLocator: Locator, optionText: string, exactOnly: boolean = false): Promise<this> {
+  async selectMatOption(selectLocator: Locator, optionText: string, timeoutMs: number = 10000, exactOnly: boolean = false): Promise<this> {
     if (!optionText) return this;
     const cleanOption = optionText.trim();
 
@@ -352,7 +352,7 @@ export class ProductVariantPage extends BasePage {
 
     // 3. Parent Product Name (Exact excel value with leading/trailing space trim, no partial matching)
     if (record.productName && record.productName.trim()) {
-      await this.selectMatOption(this.productIdSelect, record.productName.trim(), true);
+      await this.selectMatOption(this.productIdSelect, record.productName.trim(), 10000, true);
     }
 
     // 4. Variant Name (keep existing value e.g. "Cow Milk - " and append record.variantName)
@@ -437,7 +437,7 @@ export class ProductVariantPage extends BasePage {
 
     // 9. Mensuration Unit (Exact excel value with leading/trailing space trim, no partial matching)
     if (record.mensurationUnit && record.mensurationUnit.trim()) {
-      await this.selectMatOption(this.mensurationUnitSelect, record.mensurationUnit.trim(), true);
+      await this.selectMatOption(this.mensurationUnitSelect, record.mensurationUnit.trim(), 10000, true);
     }
 
     // 10. Applicable Taxes (e.g. GST 5%, GST 0%, Exempted) from record

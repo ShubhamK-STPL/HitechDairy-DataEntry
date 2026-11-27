@@ -513,6 +513,16 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    if (req.method === 'GET' && pathname === '/runner.css') {
+      serveFile(res, path.resolve(__dirname, 'runner.css'));
+      return;
+    }
+
+    if (req.method === 'GET' && pathname === '/runner.js') {
+      serveFile(res, path.resolve(__dirname, 'runner.js'));
+      return;
+    }
+
     if (req.method === 'GET' && pathname === '/api/files') {
       const files = listTestDataFiles();
       const envExcel = process.env.EXCEL_PATH ? path.basename(process.env.EXCEL_PATH) : '';
