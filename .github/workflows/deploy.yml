@@ -5,6 +5,15 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      deploy:
+        description: 'Run server deployment job'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
 
 concurrency:
   group: deploy-main
@@ -17,12 +26,12 @@ jobs:
 
     steps:
       - name: 📥 Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: 🟢 Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
 
       - name: 📦 Install Dependencies
@@ -37,6 +46,7 @@ jobs:
   deploy:
     name: 🚀 Deploy to Self-Hosted Server
     needs: ci
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.deploy == 'true'
     runs-on: ubuntu-latest
 
     steps:
