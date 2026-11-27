@@ -46,7 +46,8 @@ const MIME_TYPES: Record<string, string> = {
   '.txt': 'text/plain; charset=utf-8',
   '.md': 'text/markdown; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
-  '.js': 'application/javascript; charset=utf-8'
+  '.js': 'application/javascript; charset=utf-8',
+  '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 };
 
 interface RunParams {
@@ -325,9 +326,11 @@ function startOnboardingRun(params: RunParams): void {
   if (!MODULES.includes(requestedModule)) {
     throw new Error(`Invalid module: ${params.module}`);
   }
+  const forceHeadless = process.env.NO_OPEN === '1' || process.env.HEADLESS === 'true';
   const effectiveParams: RunParams = {
     ...params,
     module: requestedModule,
+    headless: forceHeadless ? true : params.headless,
     allowDummyMobile: Boolean(params.allowDummyMobile && ['Farmers', 'Customers', 'Suppliers'].includes(requestedModule))
   };
 
@@ -353,8 +356,8 @@ function startOnboardingRun(params: RunParams): void {
       throw new Error('ERP Password is required before running execution.');
     }
 
-    if (effectiveParams.parallel && (!Number.isFinite(effectiveParams.workers) || effectiveParams.workers < 1 || effectiveParams.workers > 8)) {
-      throw new Error('Worker count must be between 1 and 8 for parallel execution.');
+    if (effectiveParams.parallel && (!Number.isFinite(effectiveParams.workers) || effectiveParams.workers < 1 || effectiveParams.workers > 4)) {
+      throw new Error('Worker count must be between 1 and 4 for parallel execution.');
     }
 
     // Compulsory pre-validation check for Farmers module
@@ -383,7 +386,7 @@ function startOnboardingRun(params: RunParams): void {
     'src/onboarding.ts',
     `--module=${effectiveParams.module}`,
     effectiveParams.parallel ? '--parallel' : '--sequential',
-    ...(effectiveParams.parallel ? [`--workers=${Math.max(1, Math.min(8, Math.floor(effectiveParams.workers || 2)))}`] : []),
+    ...(effectiveParams.parallel ? [`--workers=${Math.max(1, Math.min(4, Math.floor(effectiveParams.workers || 2)))}`] : []),
     effectiveParams.headless ? '--headless' : '--headed',
     ...(effectiveParams.retryFailed ? ['--retry-failed'] : []),
     ...(effectiveParams.useAiIntelligence !== false ? ['--use-ai'] : ['--no-ai']),
@@ -590,6 +593,7 @@ const server = http.createServer(async (req, res) => {
         latestReport: history[0] || null,
         history,
         reportExists: fs.existsSync(path.join(REPORTS_DIR, 'run_summary.html')),
+        rowWiseReportExists: fs.existsSync(path.join(REPORTS_DIR, 'row_wise_report.xlsx')),
         reportingLabsExists: fs.existsSync(path.join(REPORTING_LABS_DIR, 'index.html')),
         aiHistoryExists: fs.existsSync(path.join(REPORTS_DIR, 'ai-intelligence', 'INTELLIGENCE_HISTORY.md'))
       });

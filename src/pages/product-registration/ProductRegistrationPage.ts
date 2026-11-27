@@ -353,14 +353,15 @@ export class ProductRegistrationPage extends BasePage {
     // Screenshot capture
     let screenshotPath: string | undefined;
     let aiAnalysis: string | undefined;
-    try {
-      const screenshotsDir = path.resolve(process.cwd(), 'test-results', 'submissions');
-      fs.mkdirSync(screenshotsDir, { recursive: true });
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const prefix = success ? 'success' : 'failure';
-      screenshotPath = path.join(screenshotsDir, `product_${prefix}_${timestamp}.png`);
-      await this.page.screenshot({ path: screenshotPath, fullPage: true });
-    } catch {}
+    if (!success) {
+      try {
+        const screenshotsDir = path.resolve(process.cwd(), 'test-results', 'submissions');
+        fs.mkdirSync(screenshotsDir, { recursive: true });
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        screenshotPath = path.join(screenshotsDir, `product_failure_${timestamp}.png`);
+        await this.page.screenshot({ path: screenshotPath, fullPage: true });
+      } catch {}
+    }
 
     // AI Analysis on failure
     if (!success && GroqIntelligenceService.isConfigured()) {

@@ -86,7 +86,7 @@ export function getExecutionSettings(argv: string[] = process.argv.slice(2)): Ex
       : rawIsParallel === 'true';
 
   const rawWorkers = Number(getCliValue(argv, 'workers') || process.env.PARALLEL_WORKERS || 2);
-  const workerCount = parallel ? Math.max(1, Number.isFinite(rawWorkers) ? Math.floor(rawWorkers) : 2) : 1;
+  const workerCount = parallel ? Math.min(4, Math.max(1, Number.isFinite(rawWorkers) ? Math.floor(rawWorkers) : 2)) : 1;
 
   const headless = argv.includes('--headed')
     ? false

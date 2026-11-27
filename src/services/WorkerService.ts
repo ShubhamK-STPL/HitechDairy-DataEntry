@@ -72,6 +72,9 @@ export class WorkerService {
 
     try {
       context = await this.browser.newContext(contextOptions);
+      await context.route(/https?:\/\/(fonts\.googleapis\.com|fonts\.gstatic\.com|maps\.googleapis\.com)\//i, (route) =>
+        route.abort().catch(() => {})
+      );
       const page = await context.newPage();
 
       // Intercept API calls per active record for the HTML API Inspector
@@ -255,7 +258,6 @@ export class WorkerService {
                 duration: Number(((Date.now() - rowStart) / 1000).toFixed(2)),
                 screenshotPath: lastScreenshotPath,
                 logs,
-                apiExchanges: currentApiExchanges.length > 0 ? [...currentApiExchanges] : undefined,
                 retried: true,
                 attempts: attempt
               });
@@ -308,7 +310,6 @@ export class WorkerService {
                 error: saveResult.message,
                 screenshotPath: lastScreenshotPath,
                 logs,
-                apiExchanges: currentApiExchanges.length > 0 ? [...currentApiExchanges] : undefined,
                 retried: isRetry,
                 attempts: attempt
               });
@@ -361,7 +362,6 @@ export class WorkerService {
               duration: Number(((Date.now() - rowStart) / 1000).toFixed(2)),
               screenshotPath: lastScreenshotPath,
               logs,
-              apiExchanges: currentApiExchanges.length > 0 ? [...currentApiExchanges] : undefined,
               retried: isRetry,
               attempts: attempt
             });
@@ -408,7 +408,6 @@ export class WorkerService {
                   duration: Number(((Date.now() - rowStart) / 1000).toFixed(2)),
                   screenshotPath: lastScreenshotPath,
                   logs,
-                  apiExchanges: currentApiExchanges.length > 0 ? [...currentApiExchanges] : undefined,
                   retried: isRetry,
                   attempts: attempt
                 });

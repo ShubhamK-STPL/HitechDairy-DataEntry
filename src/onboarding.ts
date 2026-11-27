@@ -7,12 +7,13 @@ import { getActiveWorkers, getExecutionSettings } from './config/workers';
 import { ExcelBatchService } from './services/ExcelBatchService';
 import { getModuleAdapter } from './services/ModuleAdapters';
 import { WorkerService, type WorkerRunSummary } from './services/WorkerService';
-import { buildFullSheetReportRecords } from './services/OnboardingReportBuilder';
+import { buildFullSheetReportRecords, exportRowWiseReport } from './services/OnboardingReportBuilder';
 import { CustomHistoryReporter, type TestRecordSummary } from './utils/CustomHistoryReporter';
 import { assertExcelFileWritable } from './utils/excelSheetHelper';
 import { DummyMobileAllocator } from './utils/dummyMobileAllocator';
 import { VariantSequenceAllocator } from './utils/variantSequenceAllocator';
 import { runFarmerVerification } from '../scripts/verify-farmer-records';
+import { ApiAuthService } from './services/ApiAuthService';
 
 /**
  * Clears any stale session state file and runs the Playwright login setup test
@@ -81,6 +82,44 @@ function publishFullSheetReport(
     endTime: new Date(),
     environment: `${envPrefix}${moduleName.moduleName} (${workerSummary})`
   });
+
+  exportRowWiseReport(excelPath, moduleName, liveTestRecords);
+}
+
+function pruneOldRuntimeArtifacts(): void {
+  const cwd = process.cwd();
+  const maxBackups = 10;
+  const maxAgeMs = 14 * 24 * 60 * 60 * 1000;
+  const now = Date.now();
+
+  try {
+    const backupsDir = path.resolve(cwd, 'reports', 'backups');
+    if (fs.existsSync(backupsDir)) {
+      const files = fs
+        .readdirSync(backupsDir)
+        .map((name) => {
+          const full = path.join(backupsDir, name);
+          return { full, mtime: fs.statSync(full).mtimeMs };
+        })
+        .sort((a, b) => b.mtime - a.mtime);
+      for (const old of files.slice(maxBackups)) {
+        fs.unlinkSync(old.full);
+      }
+    }
+  } catch {}
+
+  for (const relDir of ['reports/recovery', 'reports/row_wise', 'test-results/submissions']) {
+    try {
+      const dir = path.resolve(cwd, relDir);
+      if (!fs.existsSync(dir)) continue;
+      for (const name of fs.readdirSync(dir)) {
+        const full = path.join(dir, name);
+        if (now - fs.statSync(full).mtimeMs > maxAgeMs) {
+          fs.unlinkSync(full);
+        }
+      }
+    } catch {}
+  }
 }
 
 async function main() {
@@ -198,12 +237,24 @@ async function main() {
 
   console.log(`📦 Queued ${runnable.length} pending ${settings.module} record(s).\n`);
 
-  // Always clear old session data and execute login setup test before launching workers
-  clearSessionAndRunLoginTest(workers[0].storageStatePath, settings.headless);
+  // Prune old backups/recovery logs/failure screenshots to keep disk usage bounded
+  pruneOldRuntimeArtifacts();
+
+  // UI login (tests/auth.setup.ts) is kept intact but disconnected here; authenticate via API & reuse session
+  await ApiAuthService.ensureAuthenticatedSession(workers[0].storageStatePath);
 
   const browser = await chromium.launch({
     headless: settings.headless,
-    slowMo: settings.slowMo
+    slowMo: settings.slowMo,
+    args: [
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      '--disable-extensions',
+      '--disable-background-networking',
+      '--disable-sync',
+      '--mute-audio',
+      ...(process.platform === 'linux' ? ['--no-sandbox'] : [])
+    ]
   });
 
   const handleSignal = async (signal: string) => {

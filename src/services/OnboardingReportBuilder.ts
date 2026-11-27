@@ -1,7 +1,12 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import * as xlsxPkg from 'xlsx';
 import { readSheetRows } from '../utils/excelSheetHelper';
 import type { OnboardingModuleAdapter } from './ModuleAdapters';
 import type { TestRecordSummary } from '../utils/CustomHistoryReporter';
-import { formatIst12Hr } from '../utils/timeFormat';
+import { formatIst12Hr, formatIstFileStamp } from '../utils/timeFormat';
+
+const xlsx = (xlsxPkg as any).default || xlsxPkg;
 
 const REPORT_KNOWN_HEADERS = [
   'Select Organization Name',
@@ -165,4 +170,89 @@ export function buildFullSheetReportRecords(
     workerIds: Array.from(workerIdSet).sort((a, b) => a.localeCompare(b, undefined, { numeric: true })),
     sheetName
   };
+}
+
+/**
+ * Generates a dedicated row-wise Excel report (`reports/row_wise_report.xlsx` + timestamped copy)
+ * containing every row's status and failure reason.
+ */
+export function exportRowWiseReport(
+  excelPath: string,
+  adapter: OnboardingModuleAdapter<any>,
+  liveTestRecords: TestRecordSummary[] = []
+): string | null {
+  const { rows: rawRows } = readSheetRows(excelPath, adapter.sheetCandidates, REPORT_KNOWN_HEADERS);
+  const rawByRowIndex = new Map<number, Record<string, any>>();
+  for (const row of rawRows) {
+    rawByRowIndex.set(row.rowIndex, row.raw);
+  }
+
+  const liveById = new Map<string, TestRecordSummary>();
+  for (const rec of liveTestRecords) {
+    liveById.set(rec.id, rec);
+  }
+
+  const allDomainRecords = adapter.readRecords(excelPath);
+  if (allDomainRecords.length === 0) return null;
+
+  const exportRows = allDomainRecords.map((record, i) => {
+    const rowNumber = (record.rowIndex ?? i) + 1;
+    const id = `${adapter.moduleName}-row-${rowNumber}`;
+    const raw = record.rowIndex !== undefined ? (rawByRowIndex.get(record.rowIndex) || {}) : {};
+    const live = liveById.get(id);
+
+    const status = (
+      readRawColumn(raw, ['Run_Status', 'run_status', 'RunStatus']) ||
+      String(record.status || '').trim() ||
+      (live?.status === 'passed' ? 'SUCCESS' : live?.status === 'failed' ? 'FAILED' : live?.status === 'skipped' ? 'SKIPPED' : 'PENDING')
+    ).toUpperCase();
+
+    const failureReason =
+      readRawColumn(raw, ['ErrorMessage', 'error_message']) ||
+      live?.error ||
+      '';
+
+    const erpRecordId = readRawColumn(raw, ['ErpRecordId', 'erp_record_id']);
+    const workerId = readRawColumn(raw, ['WorkerId', 'worker_id']);
+    const processedAtRaw = readRawColumn(raw, ['ProcessedAt', 'processed_at']);
+
+    return {
+      'Excel Row': rowNumber,
+      Module: adapter.moduleName,
+      'Record Key': adapter.getRecordKey(record),
+      Label: adapter.getDisplayLabel(record),
+      Status: status,
+      'Failure Reason': failureReason,
+      'ERP Record ID': erpRecordId,
+      'Worker ID': workerId,
+      'Processed At': processedAtRaw ? formatIst12Hr(processedAtRaw) : ''
+    };
+  }).sort((a, b) => a['Excel Row'] - b['Excel Row']);
+
+  const wb = xlsx.utils.book_new();
+  const ws = xlsx.utils.json_to_sheet(exportRows);
+  ws['!cols'] = [
+    { wch: 10 },
+    { wch: 16 },
+    { wch: 24 },
+    { wch: 30 },
+    { wch: 18 },
+    { wch: 55 },
+    { wch: 15 },
+    { wch: 10 },
+    { wch: 24 }
+  ];
+  xlsx.utils.book_append_sheet(wb, ws, 'Row_Wise_Report');
+
+  const reportsDir = path.resolve(process.cwd(), 'reports');
+  const archiveDir = path.join(reportsDir, 'row_wise');
+  fs.mkdirSync(archiveDir, { recursive: true });
+
+  const latestPath = path.join(reportsDir, 'row_wise_report.xlsx');
+  const archivePath = path.join(archiveDir, `row_wise_${adapter.moduleName.toLowerCase()}_${formatIstFileStamp()}.xlsx`);
+
+  xlsx.writeFile(wb, latestPath);
+  xlsx.writeFile(wb, archivePath);
+  console.log(`📊 [Row-Wise Report] Saved to ${latestPath}`);
+  return latestPath;
 }

@@ -402,17 +402,18 @@ export class SupplierRegistrationPage extends BasePage {
       const success = (isExplicitSuccess && !hasErrorKeywords && !isDuplicate) ||
                       (Boolean(response && [200, 201].includes(response.status())) && !isDuplicate && !hasErrorKeywords);
 
-      // Screenshot capture
+      // Screenshot capture (failure only)
       let screenshotPath: string | undefined;
       let aiAnalysis: string | undefined;
-      try {
-        const screenshotsDir = path.resolve(process.cwd(), 'test-results', 'submissions');
-        fs.mkdirSync(screenshotsDir, { recursive: true });
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const prefix = success ? 'success' : 'failure';
-        screenshotPath = path.join(screenshotsDir, `supplier_${prefix}_${timestamp}.png`);
-        await this.page.screenshot({ path: screenshotPath, fullPage: true });
-      } catch {}
+      if (!success) {
+        try {
+          const screenshotsDir = path.resolve(process.cwd(), 'test-results', 'submissions');
+          fs.mkdirSync(screenshotsDir, { recursive: true });
+          const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+          screenshotPath = path.join(screenshotsDir, `supplier_failure_${timestamp}.png`);
+          await this.page.screenshot({ path: screenshotPath, fullPage: true });
+        } catch {}
+      }
 
       // AI Analysis on failure
       if (!success && GroqIntelligenceService.isConfigured()) {

@@ -455,13 +455,15 @@ export class AccountTransactionPage extends BasePage {
 
     const erpRecordId = this.extractRecordIdFromJson(capturedPayload);
 
-    // Take screenshot for audit reporting
-    try {
-      const ssDir = path.resolve(process.cwd(), process.env.SCREENSHOTS_DIR || 'test-results', 'submissions');
-      fs.mkdirSync(ssDir, { recursive: true });
-      screenshotPath = path.join(ssDir, `tx_${Date.now()}.png`);
-      await this.page.screenshot({ path: screenshotPath, fullPage: true }).catch(() => {});
-    } catch {}
+    // Take screenshot for audit reporting (failure only)
+    if (!isSuccess) {
+      try {
+        const ssDir = path.resolve(process.cwd(), process.env.SCREENSHOTS_DIR || 'test-results', 'submissions');
+        fs.mkdirSync(ssDir, { recursive: true });
+        screenshotPath = path.join(ssDir, `tx_failure_${Date.now()}.png`);
+        await this.page.screenshot({ path: screenshotPath, fullPage: true }).catch(() => {});
+      } catch {}
+    }
 
     return {
       success: isSuccess,
